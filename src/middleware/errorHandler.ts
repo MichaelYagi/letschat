@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
 
 export interface AppError extends Error {
@@ -6,7 +6,12 @@ export interface AppError extends Error {
   isOperational?: boolean;
 }
 
-export const errorHandler = (error: AppError, req: Request, res: Response) => {
+export const errorHandler = (
+  error: AppError,
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   const statusCode = error.statusCode || 500;
   const message = error.message || 'Internal Server Error';
 

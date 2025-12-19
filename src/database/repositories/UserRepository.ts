@@ -1,5 +1,11 @@
 import db from '../connection';
-import { User, CreateUserRequest, UserPublic, CreateSessionRequest, UserSession } from '../../types/User';
+import {
+  User,
+  CreateUserRequest,
+  UserPublic,
+  CreateSessionRequest,
+  UserSession,
+} from '../../types/User';
 import { EncryptionService } from '../../utils/encryption';
 import { SecurityService } from '../../utils/security';
 
@@ -10,12 +16,11 @@ export class UserRepository {
   static async create(userData: CreateUserRequest): Promise<User> {
     const userId = EncryptionService.generateUUID();
     const passwordHash = await SecurityService.hashPassword(userData.password);
-    
+
     const [user] = await db('users')
       .insert({
         id: userId,
         username: userData.username.toLowerCase(),
-        email: userData.email.toLowerCase(),
         password_hash: passwordHash,
         display_name: userData.displayName,
         status: 'offline',
@@ -23,10 +28,10 @@ export class UserRepository {
         updated_at: new Date(),
       })
       .returning('*');
-    
+
     return this.mapDbUserToUser(user);
   }
-  
+
   /**
    * Find user by ID
    */
@@ -34,7 +39,7 @@ export class UserRepository {
     const user = await db('users').where('id', id).first();
     return user ? this.mapDbUserToUser(user) : null;
   }
-  
+
   /**
    * Find user by username
    */
@@ -44,17 +49,7 @@ export class UserRepository {
       .first();
     return user ? this.mapDbUserToUser(user) : null;
   }
-  
-  /**
-   * Find user by email
-   */
-  static async findByEmail(email: string): Promise<User | null> {
-    const user = await db('users')
-      .where('email', email.toLowerCase())
-      .first();
-    return user ? this.mapDbUserToUser(user) : null;
-  }
-  
+
   /**
    * Check if username exists
    */
@@ -64,58 +59,49 @@ export class UserRepository {
       .first('id');
     return !!result;
   }
-  
-  /**
-   * Check if email exists
-   */
-  static async emailExists(email: string): Promise<boolean> {
-    const result = await db('users')
-      .where('email', email.toLowerCase())
-      .first('id');
-    return !!result;
-  }
-  
+
   /**
    * Update user
    */
-  static async update(id: string, updates: Partial<User>): Promise<User | null> {
+  static async update(
+    id: string,
+    updates: Partial<User>
+  ): Promise<User | null> {
     const updateData: any = {
       updated_at: new Date(),
     };
-    
+
     if (updates.displayName !== undefined) {
       updateData.display_name = updates.displayName;
     }
-    
+
     if (updates.avatarUrl !== undefined) {
       updateData.avatar_url = updates.avatarUrl;
     }
-    
+
     if (updates.status !== undefined) {
       updateData.status = updates.status;
       updateData.last_seen = new Date();
     }
-    
+
     const [user] = await db('users')
       .where('id', id)
       .update(updateData)
       .returning('*');
-    
+
     return user ? this.mapDbUserToUser(user) : null;
   }
-  
+
   /**
    * Update last seen timestamp
    */
   static async updateLastSeen(id: string): Promise<void> {
-    await db('users')
-      .where('id', id)
-      .update({
-        last_seen: new Date(),
-        updated_at: new Date(),
-      });
+    await db('users').where('id', id).update({
+      last_seen: new Date(),
+      updated_at: new Date(),
+    });
   }
-  
+
   /**
    * Get user public profile
    */
@@ -131,9 +117,9 @@ export class UserRepository {
         'last_seen'
       )
       .first();
-    
+
     if (!user) return null;
-    
+
     return {
       id: user.id,
       username: user.username,
@@ -143,11 +129,14 @@ export class UserRepository {
       lastSeen: user.last_seen,
     };
   }
-  
+
   /**
    * Search users by username
    */
-  static async searchUsers(query: string, limit: number = 20): Promise<UserPublic[]> {
+  static async searchUsers(
+    query: string,
+    limit: number = 20
+  ): Promise<UserPublic[]> {
     const users = await db('users')
       .where('username', 'ilike', `%${query.toLowerCase()}%`)
       .orWhere('display_name', 'ilike', `%${query}%`)
@@ -160,10 +149,10 @@ export class UserRepository {
         'last_seen'
       )
       .limit(limit);
-    
+
     return users.map(this.mapDbUserToPublicUser);
   }
-  
+
   /**
    * Delete user
    */
@@ -171,15 +160,17 @@ export class UserRepository {
     const deletedCount = await db('users').where('id', id).del();
     return deletedCount > 0;
   }
-  
+
   /**
    * Create user session
    */
-  static async createSession(sessionData: CreateSessionRequest): Promise<UserSession> {
+  static async createSession(
+    sessionData: CreateSessionRequest
+  ): Promise<UserSession> {
     const sessionId = EncryptionService.generateUUID();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30); // 30 days
-    
+
     const [session] = await db('user_sessions')
       .insert({
         id: sessionId,
@@ -191,39 +182,39 @@ export class UserRepository {
         created_at: new Date(),
       })
       .returning('*');
-    
+
     return this.mapDbSessionToSession(session);
   }
-  
+
   /**
    * Find session by token hash
    */
-  static async findSessionByTokenHash(tokenHash: string): Promise<UserSession | null> {
+  static async findSessionByTokenHash(
+    tokenHash: string
+  ): Promise<UserSession | null> {
     const session = await db('user_sessions')
       .where('token_hash', tokenHash)
       .andWhere('expires_at', '>', new Date())
       .first();
-    
+
     return session ? this.mapDbSessionToSession(session) : null;
   }
-  
+
   /**
    * Delete user session
    */
   static async deleteSession(sessionId: string): Promise<boolean> {
-    const deletedCount = await db('user_sessions')
-      .where('id', sessionId)
-      .del();
+    const deletedCount = await db('user_sessions').where('id', sessionId).del();
     return deletedCount > 0;
   }
-  
+
   /**
    * Delete all user sessions
    */
   static async deleteAllUserSessions(userId: string): Promise<number> {
     return await db('user_sessions').where('user_id', userId).del();
   }
-  
+
   /**
    * Clean up expired sessions
    */
@@ -232,7 +223,7 @@ export class UserRepository {
       .where('expires_at', '<=', new Date())
       .del();
   }
-  
+
   /**
    * Map database user to User model
    */
@@ -240,7 +231,6 @@ export class UserRepository {
     return {
       id: dbUser.id,
       username: dbUser.username,
-      email: dbUser.email,
       passwordHash: dbUser.password_hash,
       displayName: dbUser.display_name,
       avatarUrl: dbUser.avatar_url,
@@ -250,7 +240,7 @@ export class UserRepository {
       updatedAt: new Date(dbUser.updated_at),
     };
   }
-  
+
   /**
    * Map database user to public user
    */
@@ -264,7 +254,7 @@ export class UserRepository {
       lastSeen: new Date(dbUser.last_seen),
     };
   }
-  
+
   /**
    * Map database session to UserSession model
    */

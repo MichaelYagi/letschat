@@ -1,7 +1,6 @@
 export interface User {
   id: string;
   username: string;
-  email: string;
   passwordHash: string;
   displayName?: string;
   avatarUrl?: string;
@@ -13,7 +12,6 @@ export interface User {
 
 export interface CreateUserRequest {
   username: string;
-  email: string;
   password: string;
   displayName?: string;
 }
