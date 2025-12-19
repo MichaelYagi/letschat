@@ -1,0 +1,60 @@
+# -------------------------
+# Node.js & JavaScript
+# -------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+.pnpm-debug.log
+
+# -------------------------
+# JetBrains IDE (IntelliJ/WebStorm)
+# -------------------------
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# -------------------------
+# OS-specific junk
+# -------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# -------------------------
+# Logs & Coverage
+# -------------------------
+logs/
+*.log
+coverage/
+*.lcov
+
+# -------------------------
+# Build & Dist
+# -------------------------
+dist/
+build/
+tmp/
+temp/
+.cache/
+.out/
+
+# -------------------------
+# Environment & Config
+# -------------------------
+.env
+.env.*
+*.local
+
+# -------------------------
+# Miscellaneous
+# -------------------------
+*.swp
+*.swo
+*.bak
+*.tmp
