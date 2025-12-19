@@ -10,6 +10,8 @@ import { setupRoutes } from './routes';
 import { setupWebSocket } from './websocket';
 import { errorHandler } from './middleware/errorHandler';
 import { logger } from './utils/logger';
+import swaggerUi from 'swagger-ui-express';
+import { specs } from './config/swagger';
 
 const app = express();
 const server = createServer(app);
@@ -22,10 +24,12 @@ const io = new SocketIOServer(server, {
 
 // Security middleware
 app.use(helmet());
-app.use(cors({
-  origin: config.cors.origin,
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: config.cors.origin,
+    credentials: true,
+  })
+);
 
 // General middleware
 app.use(compression());
@@ -43,6 +47,17 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api', setupRoutes());
+
+// Swagger documentation
+app.use(
+  '/api-docs',
+  swaggerUi.serve,
+  swaggerUi.setup(specs, {
+    explorer: true,
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: "Let's Chat API Documentation",
+  })
+);
 
 // WebSocket setup
 setupWebSocket(io);
