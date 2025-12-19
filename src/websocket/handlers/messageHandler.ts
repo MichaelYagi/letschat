@@ -1,0 +1,326 @@
+import { Server as SocketIOServer, Socket } from 'socket.io';
+import { authMiddleware } from '../../config/jwt';
+import { MessageService } from '../../services/MessageService';
+import { AuthService } from '../../services/AuthService';
+import { 
+  WebSocketMessage,
+  TypingEvent,
+  UserStatusEvent,
+  CreateMessageRequest
+} from '../../types/Message';
+import { logger } from '../../utils/logger';
+
+interface AuthenticatedSocket extends Socket {
+  userId?: string;
+  username?: string;
+}
+
+export class WebSocketService {
+  private io: SocketIOServer;
+  private connectedUsers: Map<string, AuthenticatedSocket[]> = new Map();
+  private typingUsers: Map<string, Set<string>> = new Map(); // conversationId -> Set of userIds
+  
+  constructor(io: SocketIOServer) {
+    this.io = io;
+    this.setupMiddleware();
+    this.setupEventHandlers();
+    this.startHeartbeat();
+  }
+  
+  /**
+   * Setup authentication middleware
+   */
+  private setupMiddleware(): void {
+    this.io.use(async (socket: AuthenticatedSocket, next) => {
+      try {
+        const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
+        
+        if (!token) {
+          return next(new Error('Authentication required'));
+        }
+        
+        const verification = await AuthService.verifyToken(token);
+        
+        if (!verification.valid) {
+          return next(new Error('Invalid token'));
+        }
+        
+        socket.userId = verification.user!.id;
+        socket.username = verification.user!.username;
+        
+        next();
+      } catch (error) {
+        next(new Error('Authentication failed'));
+      }
+    });
+  }
+  
+  /**
+   * Setup event handlers
+   */
+  private setupEventHandlers(): void {
+    this.io.on('connection', (socket: AuthenticatedSocket) => {
+      this.handleConnection(socket);
+    });
+  }
+  
+  /**
+   * Handle new connection
+   */
+  private handleConnection(socket: AuthenticatedSocket): void {
+    logger.info(`User ${socket.username} (${socket.userId}) connected`);
+    
+    // Add to connected users
+    if (!this.connectedUsers.has(socket.userId!)) {
+      this.connectedUsers.set(socket.userId!, []);
+    }
+    this.connectedUsers.get(socket.userId!)!.push(socket);
+    
+    // Update user status to online
+    this.broadcastUserStatus(socket.userId!, 'online');
+    
+    // Setup event listeners for this socket
+    socket.on('join_conversation', (data) => this.handleJoinConversation(socket, data));
+    socket.on('leave_conversation', (data) => this.handleLeaveConversation(socket, data));
+    socket.on('send_message', (data) => this.handleSendMessage(socket, data));
+    socket.on('typing', (data) => this.handleTyping(socket, data));
+    socket.on('mark_read', (data) => this.handleMarkRead(socket, data));
+    socket.on('ping', () => this.handlePing(socket));
+    socket.on('disconnect', () => this.handleDisconnect(socket));
+  }
+  
+  /**
+   * Handle joining a conversation
+   */
+  private async handleJoinConversation(
+    socket: AuthenticatedSocket,
+    { conversationId }: { conversationId: string }
+  ): Promise<void> {
+    try {
+      // Verify user is participant
+      const conversations = await MessageService.getConversations(socket.userId!);
+      const isParticipant = conversations.some(conv => conv.id === conversationId);
+      
+      if (!isParticipant) {
+        socket.emit('error', { message: 'Not authorized to join this conversation' });
+        return;
+      }
+      
+      // Join socket room
+      socket.join(conversationId);
+      logger.info(`User ${socket.username} joined conversation ${conversationId}`);
+      
+      socket.emit('joined_conversation', { conversationId });
+    } catch (error) {
+      logger.error('Error joining conversation:', error);
+      socket.emit('error', { message: 'Failed to join conversation' });
+    }
+  }
+  
+  /**
+   * Handle leaving a conversation
+   */
+  private handleLeaveConversation(
+    socket: AuthenticatedSocket,
+    { conversationId }: { conversationId: string }
+  ): void {
+    socket.leave(conversationId);
+    logger.info(`User ${socket.username} left conversation ${conversationId}`);
+    
+    // Remove from typing indicator
+    const typingUsers = this.typingUsers.get(conversationId);
+    if (typingUsers) {
+      typingUsers.delete(socket.userId!);
+      this.broadcastTyping(conversationId);
+    }
+    
+    socket.emit('left_conversation', { conversationId });
+  }
+  
+  /**
+   * Handle sending a message
+   */
+  private async handleSendMessage(
+    socket: AuthenticatedSocket,
+    data: CreateMessageRequest
+  ): Promise<void> {
+    try {
+      // For now, we'll send messages without end-to-end encryption
+      // In a real implementation, you'd fetch recipient's public key
+      const messageEvent = await MessageService.sendMessage(
+        data,
+        socket.userId!
+      );
+      
+      // Broadcast to conversation room
+      this.io.to(data.conversationId).emit('new_message', messageEvent);
+      
+      logger.info(`User ${socket.username} sent message to ${data.conversationId}`);
+    } catch (error) {
+      logger.error('Error sending message:', error);
+      socket.emit('error', { message: error instanceof Error ? error.message : 'Failed to send message' });
+    }
+  }
+  
+  /**
+   * Handle typing indicator
+   */
+  private handleTyping(
+    socket: AuthenticatedSocket,
+    { conversationId, isTyping }: TypingEvent
+  ): void {
+    const typingUsers = this.typingUsers.get(conversationId);
+    
+    if (!typingUsers) {
+      this.typingUsers.set(conversationId, new Set());
+    }
+    
+    const users = this.typingUsers.get(conversationId)!;
+    
+    if (isTyping) {
+      users.add(socket.userId!);
+    } else {
+      users.delete(socket.userId!);
+    }
+    
+    // Broadcast typing status
+    this.broadcastTyping(conversationId);
+  }
+  
+  /**
+   * Handle marking messages as read
+   */
+  private async handleMarkRead(
+    socket: AuthenticatedSocket,
+    { conversationId }: { conversationId: string }
+  ): Promise<void> {
+    try {
+      await MessageService.markAsRead(conversationId, socket.userId!);
+      
+      // In a real implementation, you might broadcast read receipts
+      socket.emit('messages_marked_read', { conversationId });
+    } catch (error) {
+      logger.error('Error marking messages as read:', error);
+      socket.emit('error', { message: 'Failed to mark messages as read' });
+    }
+  }
+  
+  /**
+   * Handle ping for connection health
+   */
+  private handlePing(socket: AuthenticatedSocket): void {
+    socket.emit('pong');
+  }
+  
+  /**
+   * Handle disconnection
+   */
+  private handleDisconnect(socket: AuthenticatedSocket): void {
+    logger.info(`User ${socket.username} (${socket.userId}) disconnected`);
+    
+    // Remove from connected users
+    const userSockets = this.connectedUsers.get(socket.userId!);
+    if (userSockets) {
+      const index = userSockets.indexOf(socket);
+      if (index > -1) {
+        userSockets.splice(index, 1);
+      }
+      
+      if (userSockets.length === 0) {
+        this.connectedUsers.delete(socket.userId!);
+        
+        // Update user status to offline
+        this.broadcastUserStatus(socket.userId!, 'offline');
+      }
+    }
+    
+    // Clean up typing indicators
+    for (const [conversationId, typingUsers] of this.typingUsers.entries()) {
+      if (typingUsers.has(socket.userId!)) {
+        typingUsers.delete(socket.userId!);
+        this.broadcastTyping(conversationId);
+      }
+    }
+  }
+  
+  /**
+   * Broadcast user status
+   */
+  private broadcastUserStatus(userId: string, status: 'online' | 'offline'): void {
+    const statusEvent: UserStatusEvent = {
+      userId,
+      status,
+    };
+    
+    this.io.emit('user_status', statusEvent);
+  }
+  
+  /**
+   * Broadcast typing status for a conversation
+   */
+  private broadcastTyping(conversationId: string): void {
+    const typingUsers = this.typingUsers.get(conversationId) || new Set();
+    
+    const typingEvent = Array.from(typingUsers).map(userId => ({
+      conversationId,
+      userId,
+      isTyping: true,
+    }));
+    
+    this.io.to(conversationId).emit('typing', typingEvent);
+  }
+  
+  /**
+   * Send message to specific user
+   */
+  public sendToUser(userId: string, event: string, data: any): void {
+    const userSockets = this.connectedUsers.get(userId);
+    
+    if (userSockets) {
+      userSockets.forEach(socket => {
+        socket.emit(event, data);
+      });
+    }
+  }
+  
+  /**
+   * Send message to conversation
+   */
+  public sendToConversation(conversationId: string, event: string, data: any): void {
+    this.io.to(conversationId).emit(event, data);
+  }
+  
+  /**
+   * Start heartbeat for connection health
+   */
+  private startHeartbeat(): void {
+    setInterval(() => {
+      this.io.emit('heartbeat');
+    }, 30000); // 30 seconds
+  }
+  
+  /**
+   * Get connection stats
+   */
+  public getStats(): {
+    totalConnections: number;
+    uniqueUsers: number;
+    activeConversations: number;
+  } {
+    const totalConnections = Array.from(this.connectedUsers.values())
+      .reduce((sum, sockets) => sum + sockets.length, 0);
+    
+    const uniqueUsers = this.connectedUsers.size;
+    const activeConversations = this.typingUsers.size;
+    
+    return {
+      totalConnections,
+      uniqueUsers,
+      activeConversations,
+    };
+  }
+}
+
+export const setupWebSocket = (io: SocketIOServer): void => {
+  new WebSocketService(io);
+};

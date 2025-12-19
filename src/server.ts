@@ -42,7 +42,7 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
-app.use('/api', setupRoutes(authMiddleware));
+app.use('/api', setupRoutes());
 
 // WebSocket setup
 setupWebSocket(io);
