@@ -5,12 +5,15 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "nodemon src/server.ts",
+    "dev:server": "pkill -f 'node.*server.js' 2>/dev/null || true && nodemon src/server.ts",
     "dev:client": "cd client && npm run dev",
     "build": "npm run build:server && npm run build:client",
     "build:server": "tsc",
     "build:client": "cd client && npm run build",
     "start": "node dist/server.js",
+    "stop": "pkill -f 'node.*server' 2>/dev/null || true",
+    "restart": "npm run stop && sleep 2 && npm run start",
+    "server:status": "curl -s http://localhost:3000/health 2>/dev/null | grep -q '\"status\":\"ok\"' && echo 'Server is running' || echo 'Server is not running'",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -22,11 +25,12 @@
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts",
     "typecheck": "tsc --noEmit",
-    "db:migrate": "node dist/database/migrate.js",
-    "db:ping": "node dist/database/ping.js",
-    "db:status": "node dist/database/status.js",
+    "db:migrate": "npm run build:server && node dist/database/migrate.js",
+    "db:ping": "npm run build:server && node dist/database/ping.js",
+    "db:status": "npm run build:server && node dist/database/status.js",
     "test:security": "jest tests/security",
-    "test:auth": "jest tests/auth"
+    "test:auth": "jest tests/auth",
+    "test:api": "npm run server:status && curl -s http://localhost:3000/api-docs/ | grep -q swagger && echo '✅ API Docs' || echo '❌ API Docs'"
   },
   "keywords": [
     "chat",
