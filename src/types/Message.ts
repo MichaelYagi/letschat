@@ -5,6 +5,7 @@ export interface Message {
   content: string;
   contentType: 'text' | 'image' | 'file' | 'system';
   encryptedContent?: string;
+  signature?: string;
   replyToId?: string;
   threadId?: string;
   editedAt?: Date;
@@ -17,6 +18,7 @@ export interface CreateMessageRequest {
   content: string;
   contentType?: 'text' | 'image' | 'file' | 'system';
   encryptedContent?: string;
+  signature?: string;
   replyToId?: string;
   threadId?: string;
 }

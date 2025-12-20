@@ -29,8 +29,22 @@ export class AuthService {
       throw new Error('Username already taken');
     }
 
+    // Generate encryption keys if requested
+    let publicKey: string | undefined;
+    let privateKey: string | undefined;
+
+    if (userData.generateKeys !== false) {
+      const keyPair = EncryptionService.generateKeyPair();
+      publicKey = keyPair.publicKey;
+      privateKey = keyPair.privateKey;
+    }
+
     // Create user
-    const user = await UserRepository.create(userData);
+    const user = await UserRepository.create({
+      ...userData,
+      publicKey,
+      privateKey,
+    });
 
     // Generate JWT token
     const token = generateToken({

@@ -23,6 +23,8 @@ export class UserRepository {
         username: userData.username.toLowerCase(),
         password_hash: passwordHash,
         display_name: userData.displayName,
+        public_key: userData.publicKey,
+        private_key: userData.privateKey,
         status: 'offline',
         created_at: new Date(),
         updated_at: new Date(),
@@ -238,6 +240,8 @@ export class UserRepository {
       lastSeen: new Date(dbUser.last_seen),
       createdAt: new Date(dbUser.created_at),
       updatedAt: new Date(dbUser.updated_at),
+      publicKey: dbUser.public_key,
+      privateKey: dbUser.private_key,
     };
   }
 

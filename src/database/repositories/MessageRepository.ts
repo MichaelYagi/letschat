@@ -1,13 +1,13 @@
 import db from '../connection';
-import { 
-  Message, 
-  CreateMessageRequest, 
+import {
+  Message,
+  CreateMessageRequest,
   UpdateMessageRequest,
   MessageAttachment,
   Conversation,
   CreateConversationRequest,
   ConversationParticipant,
-  AddParticipantRequest
+  AddParticipantRequest,
 } from '../../types/Message';
 import { EncryptionService } from '../../utils/encryption';
 
@@ -15,9 +15,12 @@ export class MessageRepository {
   /**
    * Create a new message
    */
-  static async create(messageData: CreateMessageRequest, senderId: string): Promise<Message> {
+  static async create(
+    messageData: CreateMessageRequest,
+    senderId: string
+  ): Promise<Message> {
     const messageId = EncryptionService.generateUUID();
-    
+
     const [message] = await db('messages')
       .insert({
         id: messageId,
@@ -25,26 +28,26 @@ export class MessageRepository {
         sender_id: senderId,
         content: messageData.content,
         content_type: messageData.contentType || 'text',
+        encrypted_content: messageData.encryptedContent,
+        signature: messageData.signature,
         reply_to_id: messageData.replyToId,
         thread_id: messageData.threadId,
         created_at: new Date(),
       })
       .returning('*');
-    
+
     return this.mapDbMessageToMessage(message);
   }
-  
+
   /**
    * Find message by ID
    */
   static async findById(id: string): Promise<Message | null> {
-    const message = await db('messages')
-      .where('id', id)
-      .first();
-    
+    const message = await db('messages').where('id', id).first();
+
     return message ? this.mapDbMessageToMessage(message) : null;
   }
-  
+
   /**
    * Get messages for conversation with pagination
    */
@@ -58,19 +61,22 @@ export class MessageRepository {
       .whereNull('deleted_at')
       .orderBy('created_at', 'desc')
       .limit(limit);
-    
+
     if (before) {
       query = query.andWhere('created_at', '<', before);
     }
-    
+
     const messages = await query;
     return messages.map(this.mapDbMessageToMessage);
   }
-  
+
   /**
    * Update message
    */
-  static async update(id: string, updates: UpdateMessageRequest): Promise<Message | null> {
+  static async update(
+    id: string,
+    updates: UpdateMessageRequest
+  ): Promise<Message | null> {
     const [message] = await db('messages')
       .where('id', id)
       .whereNull('deleted_at')
@@ -79,36 +85,36 @@ export class MessageRepository {
         edited_at: new Date(),
       })
       .returning('*');
-    
+
     return message ? this.mapDbMessageToMessage(message) : null;
   }
-  
+
   /**
    * Soft delete message
    */
   static async softDelete(id: string): Promise<boolean> {
-    const deletedCount = await db('messages')
-      .where('id', id)
-      .update({
-        deleted_at: new Date(),
-      });
-    
+    const deletedCount = await db('messages').where('id', id).update({
+      deleted_at: new Date(),
+    });
+
     return deletedCount > 0;
   }
-  
+
   /**
    * Get message count for conversation
    */
-  static async getCountByConversationId(conversationId: string): Promise<number> {
+  static async getCountByConversationId(
+    conversationId: string
+  ): Promise<number> {
     const result = await db('messages')
       .where('conversation_id', conversationId)
       .whereNull('deleted_at')
       .count('* as count')
       .first();
-    
+
     return parseInt(String(result?.count || '0'));
   }
-  
+
   /**
    * Map database message to Message model
    */
@@ -120,10 +126,13 @@ export class MessageRepository {
       content: dbMessage.content,
       contentType: dbMessage.content_type,
       encryptedContent: dbMessage.encrypted_content,
+      signature: dbMessage.signature,
       replyToId: dbMessage.reply_to_id,
       threadId: dbMessage.thread_id,
       editedAt: dbMessage.edited_at ? new Date(dbMessage.edited_at) : undefined,
-      deletedAt: dbMessage.deleted_at ? new Date(dbMessage.deleted_at) : undefined,
+      deletedAt: dbMessage.deleted_at
+        ? new Date(dbMessage.deleted_at)
+        : undefined,
       createdAt: new Date(dbMessage.created_at),
     };
   }
@@ -133,9 +142,12 @@ export class ConversationRepository {
   /**
    * Create a new conversation
    */
-  static async create(conversationData: CreateConversationRequest, createdBy: string): Promise<Conversation> {
+  static async create(
+    conversationData: CreateConversationRequest,
+    createdBy: string
+  ): Promise<Conversation> {
     const conversationId = EncryptionService.generateUUID();
-    
+
     const [conversation] = await db('conversations')
       .insert({
         id: conversationId,
@@ -148,7 +160,7 @@ export class ConversationRepository {
         updated_at: new Date(),
       })
       .returning('*');
-    
+
     // Add participants
     const participants = [
       ...conversationData.participantIds.map(userId => ({
@@ -168,43 +180,58 @@ export class ConversationRepository {
         last_read_at: new Date(),
       },
     ];
-    
+
     await db('conversation_participants').insert(participants);
-    
+
     return this.mapDbConversationToConversation(conversation);
   }
-  
+
   /**
    * Find conversation by ID
    */
-  static async findById(id: string, userId: string): Promise<Conversation | null> {
+  static async findById(
+    id: string,
+    userId: string
+  ): Promise<Conversation | null> {
     const conversation = await db('conversations')
-      .join('conversation_participants', 'conversations.id', 'conversation_participants.conversation_id')
+      .join(
+        'conversation_participants',
+        'conversations.id',
+        'conversation_participants.conversation_id'
+      )
       .where('conversations.id', id)
       .where('conversation_participants.user_id', userId)
       .select('conversations.*')
       .first();
-    
-    return conversation ? this.mapDbConversationToConversation(conversation) : null;
+
+    return conversation
+      ? this.mapDbConversationToConversation(conversation)
+      : null;
   }
-  
+
   /**
    * Get user's conversations
    */
   static async getByUserId(userId: string): Promise<Conversation[]> {
     const conversations = await db('conversations')
-      .join('conversation_participants', 'conversations.id', 'conversation_participants.conversation_id')
+      .join(
+        'conversation_participants',
+        'conversations.id',
+        'conversation_participants.conversation_id'
+      )
       .where('conversation_participants.user_id', userId)
       .select('conversations.*')
       .orderBy('conversations.updated_at', 'desc');
-    
+
     return conversations.map(this.mapDbConversationToConversation);
   }
-  
+
   /**
    * Get conversation participants
    */
-  static async getParticipants(conversationId: string): Promise<ConversationParticipant[]> {
+  static async getParticipants(
+    conversationId: string
+  ): Promise<ConversationParticipant[]> {
     const participants = await db('conversation_participants')
       .join('users', 'conversation_participants.user_id', 'users.id')
       .where('conversation_participants.conversation_id', conversationId)
@@ -217,14 +244,16 @@ export class ConversationRepository {
         'conversation_participants.last_read_at'
       )
       .orderBy('conversation_participants.joined_at');
-    
+
     return participants.map(this.mapDbParticipantToParticipant);
   }
-  
+
   /**
    * Add participants to conversation
    */
-  static async addParticipants(data: AddParticipantRequest): Promise<ConversationParticipant[]> {
+  static async addParticipants(
+    data: AddParticipantRequest
+  ): Promise<ConversationParticipant[]> {
     const participants = data.userIds.map(userId => ({
       id: EncryptionService.generateUUID(),
       conversation_id: data.conversationId,
@@ -233,30 +262,36 @@ export class ConversationRepository {
       joined_at: new Date(),
       last_read_at: new Date(),
     }));
-    
+
     const inserted = await db('conversation_participants')
       .insert(participants)
       .returning('*');
-    
+
     return inserted.map(this.mapDbParticipantToParticipant);
   }
-  
+
   /**
    * Remove participant from conversation
    */
-  static async removeParticipant(conversationId: string, userId: string): Promise<boolean> {
+  static async removeParticipant(
+    conversationId: string,
+    userId: string
+  ): Promise<boolean> {
     const deletedCount = await db('conversation_participants')
       .where('conversation_id', conversationId)
       .where('user_id', userId)
       .del();
-    
+
     return deletedCount > 0;
   }
-  
+
   /**
    * Update last read timestamp
    */
-  static async updateLastRead(conversationId: string, userId: string): Promise<void> {
+  static async updateLastRead(
+    conversationId: string,
+    userId: string
+  ): Promise<void> {
     await db('conversation_participants')
       .where('conversation_id', conversationId)
       .where('user_id', userId)
@@ -264,11 +299,13 @@ export class ConversationRepository {
         last_read_at: new Date(),
       });
   }
-  
+
   /**
    * Map database conversation to Conversation model
    */
-  private static mapDbConversationToConversation(dbConversation: any): Conversation {
+  private static mapDbConversationToConversation(
+    dbConversation: any
+  ): Conversation {
     return {
       id: dbConversation.id,
       type: dbConversation.type,
@@ -280,11 +317,13 @@ export class ConversationRepository {
       updatedAt: new Date(dbConversation.updated_at),
     };
   }
-  
+
   /**
    * Map database participant to ConversationParticipant model
    */
-  private static mapDbParticipantToParticipant(dbParticipant: any): ConversationParticipant {
+  private static mapDbParticipantToParticipant(
+    dbParticipant: any
+  ): ConversationParticipant {
     return {
       id: dbParticipant.id,
       conversationId: dbParticipant.conversation_id,
