@@ -194,4 +194,26 @@ export const notificationsApi = {
   },
 };
 
+export const connectionsApi = {
+  async get(): Promise<any> {
+    const response = await api.get('/v1/connections');
+    return response.data.data;
+  },
+
+  async request(username: string): Promise<any> {
+    const response = await api.post('/v1/connections/request', { username });
+    return response.data.data;
+  },
+
+  async acceptRequest(requestId: string): Promise<any> {
+    const response = await api.put(`/v1/connections/${requestId}/accept`);
+    return response.data.data;
+  },
+
+  async rejectRequest(requestId: string): Promise<any> {
+    const response = await api.put(`/v1/connections/${requestId}/reject`);
+    return response.data.data;
+  },
+};
+
 export default api;
