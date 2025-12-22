@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UI Verification Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f5f5f5;
+      }
+      .test-section {
+        background: white;
+        padding: 20px;
+        margin: 20px 0;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .test-result {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+      }
+      .success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .info {
+        background-color: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        background-color: #007bff;
+        color: white;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      .hidden {
+        display: none;
+      }
+      iframe {
+        width: 100%;
+        height: 600px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+      }
+      .status-pending {
+        background-color: #ffc107;
+      }
+      .status-success {
+        background-color: #28a745;
+      }
+      .status-error {
+        background-color: #dc3545;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Let's Chat - UI Verification Test</h1>
+
+    <div class="test-section">
+      <h2>Server Status</h2>
+      <div id="server-status">
+        <span class="status-indicator status-pending"></span>
+        Checking server...
+      </div>
+    </div>
+
+    <div class="test-section">
+      <h2>Test 1: Registration</h2>
+      <p>Verify that user registration works and shows success message.</p>
+      <button onclick="testRegistration()">Test Registration</button>
+      <div id="registration-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Test 2: Login</h2>
+      <p>Verify that login works with registered users.</p>
+      <button onclick="testLogin()">Test Login</button>
+      <div id="login-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Test 3: Search Users</h2>
+      <p>Verify that searching for other users works.</p>
+      <button onclick="testSearchUsers()">Test Search Users</button>
+      <div id="search-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Test 4: Start Conversations</h2>
+      <p>Verify that starting conversations with other users works.</p>
+      <button onclick="testStartConversation()">Test Start Conversation</button>
+      <div id="conversation-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Test 5: Logout</h2>
+      <p>Verify that logout works properly.</p>
+      <button onclick="testLogout()">Test Logout</button>
+      <div id="logout-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Database Verification</h2>
+      <p>Check that data was properly saved to the database.</p>
+      <button onclick="verifyDatabase()">Verify Database</button>
+      <div id="database-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>Interactive UI Test</h2>
+      <p>Open the actual UI in an iframe to perform manual tests:</p>
+      <button onclick="toggleUI()">Toggle UI</button>
+      <div id="ui-container" class="hidden">
+        <iframe src="http://localhost:3001" id="ui-frame"></iframe>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = 'http://localhost:3002/api';
+      let authToken = null;
+      let testUsers = {
+        testuser1: {
+          username: 'testuser1',
+          password: 'password123',
+          displayName: 'Test User 1',
+        },
+        testuser2: {
+          username: 'testuser2',
+          password: 'password456',
+          displayName: 'Test User 2',
+        },
+      };
+
+      // Check server status
+      async function checkServerStatus() {
+        try {
+          const response = await fetch(`${API_BASE}/health`);
+          if (response.ok) {
+            document.getElementById('server-status').innerHTML =
+              '<span class="status-indicator status-success"></span>Server is running on port 3002';
+            return true;
+          } else {
+            throw new Error('Server responded with error');
+          }
+        } catch (error) {
+          document.getElementById('server-status').innerHTML =
+            '<span class="status-indicator status-error"></span>Server is not accessible: ' +
+            error.message;
+          return false;
+        }
+      }
+
+      // Test Registration
+      async function testRegistration() {
+        const resultDiv = document.getElementById('registration-result');
+        resultDiv.innerHTML =
+          '<div class="test-result info">Testing registration...</div>';
+
+        try {
+          // Register test user 1
+          const response = await fetch(`${API_BASE}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(testUsers.testuser1),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            resultDiv.innerHTML =
+              '<div class="test-result success">✅ Registration successful! User: ' +
+              testUsers.testuser1.username +
+              '</div>';
+
+            // Register second test user
+            const response2 = await fetch(`${API_BASE}/auth/register`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(testUsers.testuser2),
+            });
+
+            if (response2.ok) {
+              resultDiv.innerHTML +=
+                '<div class="test-result success">✅ Second user registered successfully!</div>';
+            }
+          } else {
+            resultDiv.innerHTML =
+              '<div class="test-result error">❌ Registration failed: ' +
+              (data.error?.message || 'Unknown error') +
+              '</div>';
+          }
+        } catch (error) {
+          resultDiv.innerHTML =
+            '<div class="test-result error">❌ Registration error: ' +
+            error.message +
+            '</div>';
+        }
+      }
+
+      // Test Login
+      async function testLogin() {
+        const resultDiv = document.getElementById('login-result');
+        resultDiv.innerHTML =
+          '<div class="test-result info">Testing login...</div>';
+
+        try {
+          const response = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: testUsers.testuser1.username,
+              password: testUsers.testuser1.password,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            authToken = data.token || data.tokens?.accessToken;
+            resultDiv.innerHTML =
+              '<div class="test-result success">✅ Login successful! User: ' +
+              testUsers.testuser1.username +
+              '</div>';
+          } else {
+            resultDiv.innerHTML =
+              '<div class="test-result error">❌ Login failed: ' +
+              (data.error?.message || 'Unknown error') +
+              '</div>';
+          }
+        } catch (error) {
+          resultDiv.innerHTML =
+            '<div class="test-result error">❌ Login error: ' +
+            error.message +
+            '</div>';
+        }
+      }
+
+      // Test Search Users
+      async function testSearchUsers() {
+        const resultDiv = document.getElementById('search-result');
+        resultDiv.innerHTML =
+          '<div class="test-result info">Testing user search...</div>';
+
+        if (!authToken) {
+          resultDiv.innerHTML =
+            '<div class="test-result error">❌ Please login first</div>';
+          return;
+        }
+
+        try {
+          const response = await fetch(
+            `${API_BASE}/auth/search?q=testuser2&limit=10`,
+            {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${authToken}`,
+              },
+            }
+          );
+
+          const data = await response.json();
+
+          if (response.ok) {
+            const users = data.data || data;
+            if (users && users.length > 0) {
+              resultDiv.innerHTML =
+                '<div class="test-result success">✅ Search successful! Found ' +
+                users.length +
+                ' user(s): ' +
+                users.map(u => u.username || u.displayName).join(', ') +
+                '</div>';
+            } else {
+              resultDiv.innerHTML =
+                '<div class="test-result info">ℹ️ Search worked but no users found</div>';
+            }
+          } else {
+            resultDiv.innerHTML =
+              '<div class="test-result error">❌ Search failed: ' +
+              (data.error?.message || 'Unknown error') +
+              '</div>';
+          }
+        } catch (error) {
+          resultDiv.innerHTML =
+            '<div class="test-result error">❌ Search error: ' +
+            error.message +
+            '</div>';
+        }
+      }
+
+      // Test Start Conversation
+      async function testStartConversation() {
+        const resultDiv = document.getElementById('conversation-result');
+        resultDiv.innerHTML =
+          '<div class="test-result info">Testing conversation start...</div>';
+
+        if (!authToken) {
+          resultDiv.innerHTML =
+            '<div class="test-result error">❌ Please login first</div>';
+          return;
+        }
+
+        try {
+          // First get the user ID for testuser2
+          const searchResponse = await fetch(
+            `${API_BASE}/auth/search?q=testuser2&limit=10`,
+            {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${authToken}`,
+              },
+            }
+          );
+
+          const searchData = await searchResponse.json();
+          const users = searchData.data || searchData;
+
+          if (!users || users.length === 0) {
+            resultDiv.innerHTML =
+              '<div class="test-result error">❌ Could not find user to start conversation with</div>';
+            return;
+          }
+
+          const targetUser = users[0];
+
+          // Start conversation
+          const conversationResponse = await fetch(
+            `${API_BASE}/messages/conversations`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${authToken}`,
+              },
+              body: JSON.stringify({
+                participantId: targetUser.id || targetUser._id,
+                message: 'Hello from automated test!',
+              }),
+            }
+          );
+
+          const conversationData = await conversationResponse.json();
+
+          if (conversationResponse.ok) {
+            resultDiv.innerHTML =
+              '<div class="test-result success">✅ Conversation started successfully with ' +
+              targetUser.username +
+              '!</div>';
+          } else {
+            resultDiv.innerHTML =
+              '<div class="test-result error">❌ Conversation failed: ' +
+              (conversationData.error?.message || 'Unknown error') +
+              '</div>';
+          }
+        } catch (error) {
+          resultDiv.innerHTML =
+            '<div class="test-result error">❌ Conversation error: ' +
+            error.message +
+            '</div>';
+        }
+      }
+
+      // Test Logout
+      async function testLogout() {
+        const resultDiv = document.getElementById('logout-result');
+        resultDiv.innerHTML =
+          '<div class="test-result info">Testing logout...</div>';
+
+        if (!authToken) {
+          resultDiv.innerHTML =
+            '<div class="test-result info">ℹ️ No active session to logout</div>';
+          return;
+        }
+
+        try {
+          const response = await fetch(`${API_BASE}/auth/logout`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+
+          authToken = null;
+
+          if (response.ok) {
+            resultDiv.innerHTML =
+              '<div class="test-result success">✅ Logout successful!</div>';
+          } else {
+            resultDiv.innerHTML =
+              '<div class="test-result info">ℹ️ Logout completed (token cleared locally)</div>';
+          }
+        } catch (error) {
+          authToken = null;
+          resultDiv.innerHTML =
+            '<div class="test-result info">ℹ️ Logout completed locally (server error: ' +
+            error.message +
+            ')</div>';
+        }
+      }
+
+      // Verify Database
+      async function verifyDatabase() {
+        const resultDiv = document.getElementById('database-result');
+        resultDiv.innerHTML =
+          '<div class="test-result info">Checking database...</div>';
+
+        try {
+          // This would typically require a database endpoint, but for now we'll simulate it
+          // by trying to login with the test users we created
+          const response1 = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: testUsers.testuser1.username,
+              password: testUsers.testuser1.password,
+            }),
+          });
+
+          const response2 = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: testUsers.testuser2.username,
+              password: testUsers.testuser2.password,
+            }),
+          });
+
+          if (response1.ok && response2.ok) {
+            resultDiv.innerHTML =
+              '<div class="test-result success">✅ Database verification successful! Both test users exist and can authenticate.</div>';
+          } else {
+            resultDiv.innerHTML =
+              '<div class="test-result error">❌ Database verification failed. Users may not have been saved properly.</div>';
+          }
+        } catch (error) {
+          resultDiv.innerHTML =
+            '<div class="test-result error">❌ Database verification error: ' +
+            error.message +
+            '</div>';
+        }
+      }
+
+      // Toggle UI
+      function toggleUI() {
+        const container = document.getElementById('ui-container');
+        container.classList.toggle('hidden');
+      }
+
+      // Initialize
+      window.onload = function () {
+        checkServerStatus();
+      };
+    </script>
+  </body>
+</html>

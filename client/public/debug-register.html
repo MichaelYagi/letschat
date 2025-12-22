@@ -1,0 +1,220 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Registration Debug</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      .error {
+        color: red;
+        background: #fee;
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+      }
+      .success {
+        color: green;
+        background: #efe;
+        padding: 10px;
+        border-radius: 5px;
+        margin: 10px 0;
+      }
+      .form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 20px 0;
+      }
+      input {
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      button {
+        padding: 10px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      pre {
+        background: #f5f5f5;
+        padding: 10px;
+        border-radius: 5px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔍 Registration Debug</h1>
+
+    <div id="result"></div>
+
+    <div class="form">
+      <input
+        type="text"
+        id="username"
+        placeholder="Username"
+        value="test_debug_12345"
+      />
+      <input
+        type="password"
+        id="password"
+        placeholder="Password"
+        value="TestPassword123!"
+      />
+      <button onclick="testRegistration()">Test Registration</button>
+      <button onclick="testLogin()">Test Login</button>
+      <button onclick="clearResults()">Clear Results</button>
+    </div>
+
+    <h2>📋 Results:</h2>
+    <pre id="logs"></pre>
+
+    <script>
+      let logs = [];
+
+      function log(message) {
+        logs.push(new Date().toISOString() + ' - ' + message);
+        document.getElementById('logs').textContent = logs.join('\\n');
+      }
+
+      function showResult(message, isSuccess = false) {
+        const resultDiv = document.getElementById('result');
+        resultDiv.innerHTML = `<div class="${isSuccess ? 'success' : 'error'}">${message}</div>`;
+      }
+
+      function clearResults() {
+        document.getElementById('result').innerHTML = '';
+        logs = [];
+        document.getElementById('logs').textContent = '';
+      }
+
+      async function testRegistration() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        log(`🔄 Starting registration for user: ${username}`);
+
+        try {
+          const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              username,
+              password,
+            }),
+          });
+
+          log(`📡 Response status: ${response.status} ${response.statusText}`);
+          log(
+            `📋 Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`
+          );
+
+          const responseText = await response.text();
+          log(`📄 Response body: ${responseText}`);
+
+          if (response.ok) {
+            try {
+              const data = JSON.parse(responseText);
+              log(`✅ Registration successful: ${JSON.stringify(data)}`);
+              showResult(
+                `✅ Registration successful! User ${username} created.`,
+                true
+              );
+
+              // Store token
+              if (data.data && data.data.token) {
+                localStorage.setItem('letschat_token', data.data.token);
+                log(`💾 Token stored: ${data.data.token.substring(0, 20)}...`);
+              }
+            } catch (e) {
+              log(`❌ Failed to parse JSON: ${e.message}`);
+              showResult('❌ Invalid response format', false);
+            }
+          } else {
+            log(`❌ Registration failed with status ${response.status}`);
+            showResult(`❌ Registration failed: ${responseText}`, false);
+          }
+        } catch (error) {
+          log(`💥 Network error: ${error.message}`);
+          showResult(`❌ Network error: ${error.message}`, false);
+        }
+      }
+
+      async function testLogin() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        log(`🔄 Starting login for user: ${username}`);
+
+        try {
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              username,
+              password,
+            }),
+          });
+
+          log(`📡 Login response status: ${response.status}`);
+
+          const responseText = await response.text();
+          log(`📄 Login response body: ${responseText}`);
+
+          if (response.ok) {
+            const data = JSON.parse(responseText);
+            log(`✅ Login successful: ${JSON.stringify(data)}`);
+            showResult(`✅ Login successful! Welcome ${username}.`, true);
+
+            if (data.data && data.data.token) {
+              localStorage.setItem('letschat_token', data.data.token);
+              log(`💾 Login token stored`);
+            }
+          } else {
+            log(`❌ Login failed: ${responseText}`);
+            showResult(`❌ Login failed: ${responseText}`, false);
+          }
+        } catch (error) {
+          log(`💥 Login network error: ${error.message}`);
+          showResult(`❌ Login network error: ${error.message}`, false);
+        }
+      }
+
+      // Test servers
+      async function testServers() {
+        log('🔍 Testing server connectivity...');
+
+        try {
+          const frontend = await fetch('/');
+          log(`✅ Frontend accessible: ${frontend.status}`);
+        } catch (e) {
+          log(`❌ Frontend error: ${e.message}`);
+        }
+
+        try {
+          const backend = await fetch('/api/health');
+          log(`✅ Backend health: ${await backend.text()}`);
+        } catch (e) {
+          log(`❌ Backend error: ${e.message}`);
+        }
+      }
+
+      // Auto-test servers on load
+      testServers();
+    </script>
+  </body>
+</html>

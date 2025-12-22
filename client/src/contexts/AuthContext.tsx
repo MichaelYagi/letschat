@@ -127,7 +127,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
                       username: userData.username,
                       status: 'online',
                       lastSeen: new Date().toISOString(),
-                      displayName: userData.username,
                     },
                     token,
                   },

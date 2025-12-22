@@ -12,7 +12,16 @@ app.use(
 
 app.use(express.json());
 
-// Simple database users - will be loaded from SQLite
+// Simple database users
+const users = [
+  {
+    id: '1',
+    username: 'alice',
+    password: 'password123',
+    displayName: 'Alice',
+  },
+  { id: '2', username: 'bob', password: 'password456', displayName: 'Bob' },
+];
 
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;

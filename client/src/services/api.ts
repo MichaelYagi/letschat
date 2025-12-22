@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { LoginCredentials, RegisterData, AuthResponse } from '../types/auth';
 
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -70,16 +70,20 @@ api.interceptors.response.use(
 export const authApi = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const response = await api.post('/auth/login', credentials);
-    const { user, tokens } = response.data.data || response.data;
-    localStorage.setItem('letschat_token', tokens.accessToken);
-    return { user, token: tokens.accessToken };
+    const responseData = response.data.data || response.data;
+    const { user, token, tokens } = responseData;
+    const accessToken = token || tokens?.accessToken;
+    localStorage.setItem('letschat_token', accessToken);
+    return { user, token: accessToken };
   },
 
   async register(data: RegisterData): Promise<AuthResponse> {
     const response = await api.post('/auth/register', data);
-    const { user, tokens } = response.data.data || response.data;
-    localStorage.setItem('letschat_token', tokens.accessToken);
-    return { user, token: tokens.accessToken };
+    const responseData = response.data.data || response.data;
+    const { user, token, tokens } = responseData;
+    const accessToken = token || tokens?.accessToken;
+    localStorage.setItem('letschat_token', accessToken);
+    return { user, token: accessToken };
   },
 
   async logout(): Promise<void> {
@@ -103,12 +107,12 @@ export const authApi = {
 
 export const conversationsApi = {
   async getConversations(): Promise<any> {
-    const response = await api.get('/v1/conversations');
+    const response = await api.get('/messages/conversations');
     return response.data.data;
   },
 
   async createConversation(data: any): Promise<any> {
-    const response = await api.post('/v1/conversations', data);
+    const response = await api.post('/messages/conversations', data);
     return response.data.data;
   },
 
@@ -276,8 +280,8 @@ export const connectionsApi = {
 
 export const usersApi = {
   async searchUsers(query: string, limit: number = 10): Promise<any> {
-    const response = await api.get('/v1/users/search', {
-      params: { query, limit },
+    const response = await api.get('/auth/search', {
+      params: { q: query, limit },
     });
     return response.data.data;
   },

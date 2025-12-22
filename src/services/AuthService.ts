@@ -192,9 +192,9 @@ export class AuthService {
     this.validateUpdateUserData(updates);
 
     // Check if username is being updated and already exists
-    if (updates.displayName) {
+    if (updates.username) {
       const existingUser = await UserRepository.findById(userId);
-      if (existingUser && existingUser.displayName !== updates.displayName) {
+      if (existingUser && existingUser.username !== updates.username) {
         // Additional validation can be added here
       }
     }
@@ -263,22 +263,12 @@ export class AuthService {
     if (!passwordValidation.isValid) {
       throw new Error(passwordValidation.errors.join(', '));
     }
-
-    // Validate display name if provided
-    if (userData.displayName && userData.displayName.length > 50) {
-      throw new Error('Display name cannot exceed 50 characters');
-    }
   }
 
   /**
    * Validate update user data
    */
   private static validateUpdateUserData(updates: UpdateUserRequest): void {
-    // Validate display name if provided
-    if (updates.displayName !== undefined && updates.displayName.length > 50) {
-      throw new Error('Display name cannot exceed 50 characters');
-    }
-
     // Validate avatar URL if provided
     if (updates.avatarUrl !== undefined) {
       const urlPattern = /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i;

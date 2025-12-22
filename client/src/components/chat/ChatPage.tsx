@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { TypingIndicator } from './TypingIndicator';
@@ -10,12 +11,12 @@ import { Phone, Video, Info } from 'lucide-react';
 import api from '../../services/api';
 
 interface ChatPageProps {
-  conversationId?: string;
   conversationName?: string;
   onClose?: () => void;
 }
 
-export function ChatPage({ conversationId, conversationName }: ChatPageProps) {
+export function ChatPage({ conversationName }: ChatPageProps) {
+  const { conversationId } = useParams<{ conversationId: string }>();
   const { user } = useAuth();
   const {
     messages,
@@ -26,14 +27,13 @@ export function ChatPage({ conversationId, conversationName }: ChatPageProps) {
     typingUsers,
   } = useWebSocket();
 
-  const { showMessageNotification } = useNotifications();
+  const { addNotification } = useNotifications();
   const { playNotificationSound } = useSoundNotifications();
 
   // Convert typingUsers Set to array of user objects
   const typingUsersArray = Array.from(typingUsers).map(userId => ({
     id: userId,
     username: `User${userId.slice(0, 4)}`, // In real app, get from user list
-    displayName: `User${userId.slice(0, 4)}`,
   }));
   const [isLoading, setIsLoading] = useState(true);
   const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(
@@ -56,13 +56,19 @@ export function ChatPage({ conversationId, conversationName }: ChatPageProps) {
       lastMessage.senderId !== user?.id &&
       !document.hasFocus()
     ) {
-      showMessageNotification(lastMessage, conversationName);
+      addNotification({
+        id: Date.now(),
+        type: 'message',
+        title: `New message from ${conversationName}`,
+        content: lastMessage.content,
+        timestamp: new Date(),
+      });
       playNotificationSound();
     }
   }, [
     messages,
     user?.id,
-    showMessageNotification,
+    addNotification,
     conversationName,
     playNotificationSound,
   ]);

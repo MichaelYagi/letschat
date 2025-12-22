@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Registration & Login</title>
+    <script>
+      async function register() {
+        const username = `testuser${Date.now()}`;
+        const password = 'testpass123';
+
+        try {
+          const response = await fetch(
+            'http://localhost:3000/api/auth/register',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ username, password }),
+            }
+          );
+
+          const result = await response.json();
+          console.log('Registration result:', result);
+
+          if (response.ok) {
+            document.getElementById('status').innerHTML = `
+                        <div style="color: green;">
+                            ✅ Registration successful for user: ${username}<br>
+                            Success message: ${result.message || 'User registered successfully'}<br>
+                            User ID: ${result.user.id}
+                        </div>
+                    `;
+            return {
+              success: true,
+              username,
+              password,
+              userId: result.user.id,
+            };
+          } else {
+            document.getElementById('status').innerHTML = `
+                        <div style="color: red;">
+                            ❌ Registration failed: ${result.error}
+                        </div>
+                    `;
+            return { success: false, error: result.error };
+          }
+        } catch (error) {
+          console.error('Registration error:', error);
+          document.getElementById('status').innerHTML = `
+                    <div style="color: red;">
+                        ❌ Network error: ${error.message}
+                    </div>
+                `;
+          return { success: false, error: error.message };
+        }
+      }
+
+      async function login(username, password) {
+        try {
+          const response = await fetch('http://localhost:3000/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, password }),
+          });
+
+          const result = await response.json();
+          console.log('Login result:', result);
+
+          if (response.ok) {
+            document.getElementById('status').innerHTML += `
+                        <div style="color: green;">
+                            ✅ Login successful for ${username}<br>
+                            Token received: ${result.token.substring(0, 20)}...<br>
+                            User ID: ${result.user.id}
+                        </div>
+                    `;
+            return {
+              success: true,
+              token: result.token,
+              userId: result.user.id,
+            };
+          } else {
+            document.getElementById('status').innerHTML += `
+                        <div style="color: red;">
+                            ❌ Login failed: ${result.error}
+                        </div>
+                    `;
+            return { success: false, error: result.error };
+          }
+        } catch (error) {
+          console.error('Login error:', error);
+          document.getElementById('status').innerHTML += `
+                    <div style="color: red;">
+                        ❌ Network error: ${error.message}
+                    </div>
+                `;
+          return { success: false, error: error.message };
+        }
+      }
+
+      async function logout(token) {
+        try {
+          const response = await fetch(
+            'http://localhost:3000/api/auth/logout',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+
+          const result = await response.json();
+          console.log('Logout result:', result);
+
+          if (response.ok) {
+            document.getElementById('status').innerHTML += `
+                        <div style="color: green;">
+                            ✅ Logout successful: ${result.message}
+                        </div>
+                    `;
+            return { success: true };
+          } else {
+            document.getElementById('status').innerHTML += `
+                        <div style="color: red;">
+                            ❌ Logout failed: ${result.error}
+                        </div>
+                    `;
+            return { success: false, error: result.error };
+          }
+        } catch (error) {
+          console.error('Logout error:', error);
+          document.getElementById('status').innerHTML += `
+                    <div style="color: red;">
+                        ❌ Network error: ${error.message}
+                    </div>
+                `;
+          return { success: false, error: error.message };
+        }
+      }
+
+      async function searchUsers(token) {
+        try {
+          const response = await fetch(
+            'http://localhost:3000/api/users/search?q=test',
+            {
+              method: 'GET',
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          const result = await response.json();
+          console.log('Search result:', result);
+
+          if (response.ok) {
+            document.getElementById('status').innerHTML += `
+                        <div style="color: green;">
+                            ✅ User search successful<br>
+                            Found ${result.users.length} users: ${result.users.map(u => u.username).join(', ')}
+                        </div>
+                    `;
+            return { success: true, users: result.users };
+          } else {
+            document.getElementById('status').innerHTML += `
+                        <div style="color: red;">
+                            ❌ User search failed: ${result.error}
+                        </div>
+                    `;
+            return { success: false, error: result.error };
+          }
+        } catch (error) {
+          console.error('Search error:', error);
+          document.getElementById('status').innerHTML += `
+                    <div style="color: red;">
+                        ❌ Network error: ${error.message}
+                    </div>
+                `;
+          return { success: false, error: error.message };
+        }
+      }
+
+      async function createConversation(token, userId) {
+        try {
+          const response = await fetch(
+            'http://localhost:3000/api/connections',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ userId }),
+            }
+          );
+
+          const result = await response.json();
+          console.log('Conversation creation result:', result);
+
+          if (response.ok) {
+            document.getElementById('status').innerHTML += `
+                        <div style="color: green;">
+                            ✅ Conversation created successfully<br>
+                            Connection ID: ${result.connection.id}<br>
+                            With user: ${result.connection.otherUser.username}
+                        </div>
+                    `;
+            return { success: true, connection: result.connection };
+          } else {
+            document.getElementById('status').innerHTML += `
+                        <div style="color: red;">
+                            ❌ Conversation creation failed: ${result.error}
+                        </div>
+                    `;
+            return { success: false, error: result.error };
+          }
+        } catch (error) {
+          console.error('Conversation creation error:', error);
+          document.getElementById('status').innerHTML += `
+                    <div style="color: red;">
+                        ❌ Network error: ${error.message}
+                    </div>
+                `;
+          return { success: false, error: error.message };
+        }
+      }
+
+      async function testAll() {
+        document.getElementById('status').innerHTML =
+          '<h3>🧪 Testing Registration, Login, Logout and User Features...</h3>';
+
+        // Test Registration
+        const regResult = await register();
+        if (!regResult.success) {
+          return;
+        }
+
+        // Test Login
+        const loginResult = await login(regResult.username, regResult.password);
+        if (!loginResult.success) {
+          return;
+        }
+
+        // Test User Search
+        const searchResult = await searchUsers(loginResult.token);
+
+        // Test Conversation Creation (if users found)
+        if (
+          searchResult &&
+          searchResult.success &&
+          searchResult.users.length > 0
+        ) {
+          const otherUser = searchResult.users.find(
+            u => u.id !== loginResult.userId
+          );
+          if (otherUser) {
+            await createConversation(loginResult.token, otherUser.id);
+          }
+        }
+
+        // Test Logout
+        await logout(loginResult.token);
+
+        document.getElementById('status').innerHTML += `
+                <div style="color: blue; font-weight: bold;">
+                    🎉 All tests completed! Check the database for verification.
+                </div>
+            `;
+      }
+    </script>
+  </head>
+  <body>
+    <h1>🧪 Let'sChat Feature Test</h1>
+    <button
+      onclick="testAll()"
+      style="
+        font-size: 18px;
+        padding: 10px 20px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      "
+    >
+      Run All Tests
+    </button>
+
+    <div
+      id="status"
+      style="
+        margin-top: 20px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      "
+    ></div>
+
+    <div style="margin-top: 20px">
+      <h3>📊 Database Verification</h3>
+      <p>After running tests, check the database to verify:</p>
+      <ul>
+        <li>New users created</li>
+        <li>Sessions properly managed</li>
+        <li>Connections created</li>
+      </ul>
+    </div>
+  </body>
+</html>

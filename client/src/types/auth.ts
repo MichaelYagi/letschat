@@ -1,7 +1,6 @@
 export interface User {
   id: string;
   username: string;
-  displayName?: string;
   email?: string;
   bio?: string;
   avatarUrl?: string;
@@ -19,7 +18,6 @@ export interface LoginCredentials {
 export interface RegisterData {
   username: string;
   password: string;
-  displayName?: string;
 }
 
 export interface AuthResponse {

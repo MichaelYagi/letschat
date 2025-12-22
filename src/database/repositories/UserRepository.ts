@@ -22,7 +22,6 @@ export class UserRepository {
         id: userId,
         username: userData.username.toLowerCase(),
         password_hash: passwordHash,
-        display_name: userData.displayName,
         public_key: userData.publicKey,
         private_key: userData.privateKey,
         status: 'offline',
@@ -73,10 +72,6 @@ export class UserRepository {
       updated_at: new Date(),
     };
 
-    if (updates.displayName !== undefined) {
-      updateData.display_name = updates.displayName;
-    }
-
     if (updates.avatarUrl !== undefined) {
       updateData.avatar_url = updates.avatarUrl;
     }
@@ -110,14 +105,7 @@ export class UserRepository {
   static async getPublicProfile(id: string): Promise<UserPublic | null> {
     const user = await db('users')
       .where('id', id)
-      .select(
-        'id',
-        'username',
-        'display_name',
-        'avatar_url',
-        'status',
-        'last_seen'
-      )
+      .select('id', 'username', 'avatar_url', 'status', 'last_seen')
       .first();
 
     if (!user) return null;
@@ -125,7 +113,6 @@ export class UserRepository {
     return {
       id: user.id,
       username: user.username,
-      displayName: user.display_name || user.username,
       avatarUrl: user.avatar_url,
       status: user.status,
       lastSeen: user.last_seen,
@@ -141,15 +128,7 @@ export class UserRepository {
   ): Promise<UserPublic[]> {
     const users = await db('users')
       .where('username', 'ilike', `%${query.toLowerCase()}%`)
-      .orWhere('display_name', 'ilike', `%${query}%`)
-      .select(
-        'id',
-        'username',
-        'display_name',
-        'avatar_url',
-        'status',
-        'last_seen'
-      )
+      .select('id', 'username', 'avatar_url', 'status', 'last_seen')
       .limit(limit);
 
     return users.map(this.mapDbUserToPublicUser);
@@ -234,7 +213,6 @@ export class UserRepository {
       id: dbUser.id,
       username: dbUser.username,
       passwordHash: dbUser.password_hash,
-      displayName: dbUser.display_name,
       avatarUrl: dbUser.avatar_url,
       status: dbUser.status,
       lastSeen: new Date(dbUser.last_seen),
@@ -252,7 +230,6 @@ export class UserRepository {
     return {
       id: dbUser.id,
       username: dbUser.username,
-      displayName: dbUser.display_name,
       avatarUrl: dbUser.avatar_url,
       status: dbUser.status,
       lastSeen: new Date(dbUser.last_seen),

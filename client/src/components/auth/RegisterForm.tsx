@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { X, UserPlus, Mail, Lock, User } from 'lucide-react';
+import { X, UserPlus, Lock, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 
@@ -11,42 +11,56 @@ interface RegisterFormProps {
 export function RegisterForm({ onSuccess }: RegisterFormProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const { register } = useAuth();
-
-  // WebSocket connection for real-time error monitoring
-  React.useEffect(() => {
-    const socket = io('http://localhost:3000');
-
-    socket.connect();
-
-    socket.on('connect', () => {
-      console.log('🔌 Connected to error monitoring server');
-    });
-
-    socket.on('connect_error', error => {
-      console.error('🔌 WebSocket connection error:', error);
-      setError('Connection error: ' + error);
-    });
-
-    socket.on('disconnect', () => {
-      console.log('🔌 Disconnected from error monitoring server');
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
 
-    if (!username || !password) {
-      setError('Username and password are required');
+    // Validate username
+    if (!username) {
+      setError('Username is required');
+      setLoading(false);
+      return;
+    }
+
+    if (
+      username.length < 3 ||
+      username.length > 20 ||
+      !/^[a-zA-Z0-9_]+$/.test(username)
+    ) {
+      setError(
+        'Username must be 3-20 characters, alphanumeric and underscores only'
+      );
+      setLoading(false);
+      return;
+    }
+
+    // Validate password
+    if (!password) {
+      setError('Password is required');
+      setLoading(false);
+      return;
+    }
+
+    const passwordErrors = [];
+    if (password.length < 8) passwordErrors.push('at least 8 characters');
+    if (password.length > 128) passwordErrors.push('less than 128 characters');
+    if (!/[A-Z]/.test(password))
+      passwordErrors.push('at least one uppercase letter');
+    if (!/[a-z]/.test(password))
+      passwordErrors.push('at least one lowercase letter');
+    if (!/\d/.test(password)) passwordErrors.push('at least one number');
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password))
+      passwordErrors.push('at least one special character');
+
+    if (passwordErrors.length > 0) {
+      setError(`Password must contain ${passwordErrors.join(', ')}`);
       setLoading(false);
       return;
     }
@@ -56,10 +70,11 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
       await register({
         username,
         password,
-        displayName: displayName || username, // Fallback to username if display name is empty
       });
-
-      onSuccess?.();
+      setSuccess('✅ Registration successful! Redirecting to login...');
+      setTimeout(() => {
+        onSuccess?.();
+      }, 2000);
     } catch (err: any) {
       setError(err.message || 'Registration failed');
     } finally {
@@ -84,6 +99,11 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
               {error}
             </div>
           )}
+          {success && (
+            <div className='bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded'>
+              {success}
+            </div>
+          )}
           <div className='space-y-4'>
             <div>
               <label
@@ -105,28 +125,6 @@ export function RegisterForm({ onSuccess }: RegisterFormProps) {
                   placeholder='Enter username'
                   value={username}
                   onChange={e => setUsername(e.target.value)}
-                />
-              </div>
-            </div>
-            <div>
-              <label
-                htmlFor='displayName'
-                className='block text-sm font-medium text-gray-700'
-              >
-                Display Name (optional)
-              </label>
-              <div className='mt-1 relative'>
-                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
-                  <User className='h-5 w-5 text-gray-400' />
-                </div>
-                <input
-                  id='displayName'
-                  name='displayName'
-                  type='text'
-                  className='appearance-none rounded-md relative block w-full pl-10 pr-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm'
-                  placeholder='Enter display name (optional)'
-                  value={displayName}
-                  onChange={e => setDisplayName(e.target.value)}
                 />
               </div>
             </div>

@@ -1,0 +1,175 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Registration Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 500px;
+        margin: 50px auto;
+        padding: 20px;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      input {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      .result {
+        margin-top: 20px;
+        padding: 15px;
+        border-radius: 4px;
+      }
+      .success {
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+      }
+      .error {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+      }
+      pre {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Registration Debug Test</h1>
+
+    <form id="registerForm">
+      <div class="form-group">
+        <label for="username">Username:</label>
+        <input type="text" id="username" value="testuser7" required />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password:</label>
+        <input type="password" id="password" value="TestPass123!" required />
+      </div>
+
+      <button type="submit">Register</button>
+    </form>
+
+    <div id="result"></div>
+
+    <script>
+      const registerForm = document.getElementById('registerForm');
+      const resultDiv = document.getElementById('result');
+
+      registerForm.addEventListener('submit', async e => {
+        e.preventDefault();
+
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        // Clear previous results
+        resultDiv.innerHTML = '<p>🔄 Testing registration...</p>';
+
+        try {
+          console.log('=== Registration Test Started ===');
+          console.log('Username:', username);
+          console.log('Password:', password);
+
+          // Test 1: Direct API call
+          console.log('\n📡 Testing direct API call...');
+          const directResponse = await fetch(
+            'http://localhost:3000/api/auth/register',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Origin: 'http://localhost:5173',
+              },
+              body: JSON.stringify({ username, password }),
+              mode: 'cors',
+            }
+          );
+
+          console.log('Direct response status:', directResponse.status);
+          console.log('Direct response headers:', [
+            ...directResponse.headers.entries(),
+          ]);
+
+          const directData = await directResponse.json();
+          console.log('Direct response data:', directData);
+
+          // Test 2: Through Vite proxy
+          console.log('\n🔗 Testing through Vite proxy...');
+          const proxyResponse = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, password }),
+          });
+
+          console.log('Proxy response status:', proxyResponse.status);
+          console.log('Proxy response headers:', [
+            ...proxyResponse.headers.entries(),
+          ]);
+
+          const proxyData = await proxyResponse.json();
+          console.log('Proxy response data:', proxyData);
+
+          // Display results
+          resultDiv.innerHTML = `
+                    <h2>🎯 Results</h2>
+                    
+                    <div class="result success">
+                        <h3>✅ Direct API Call (http://localhost:3000)</h3>
+                        <p><strong>Status:</strong> ${directResponse.status}</p>
+                        <pre>${JSON.stringify(directData, null, 2)}</pre>
+                    </div>
+                    
+                    <div class="result ${proxyResponse.ok ? 'success' : 'error'}">
+                        <h3>🔗 Vite Proxy (/api/auth/register)</h3>
+                        <p><strong>Status:</strong> ${proxyResponse.status}</p>
+                        <pre>${JSON.stringify(proxyData, null, 2)}</pre>
+                    </div>
+                    
+                    <div class="result">
+                        <h3>🔍 Browser Network Logs</h3>
+                        <p><em>Check browser dev tools Network tab for detailed request/response information</em></p>
+                        <p><em>Open console to see detailed logs</em></p>
+                    </div>
+                `;
+        } catch (error) {
+          console.error('❌ Registration error:', error);
+          resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ Error</h3>
+                        <p>${error.message}</p>
+                        <pre>${error.stack}</pre>
+                    </div>
+                `;
+        }
+
+        console.log('=== Registration Test Complete ===');
+      });
+    </script>
+  </body>
+</html>

@@ -35,7 +35,7 @@
     "jsdom": "^21.1.0"
   },
   "scripts": {
-    "dev": "vite --config vite.config.mjs",
+    "dev": "vite --config vite.config.ts --port 5173",
     "build": "vite build --config vite.config.mjs",
     "preview": "vite preview --config vite.config.mjs",
     "test": "vitest",
