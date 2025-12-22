@@ -1,4 +1,6 @@
 import { Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { FileService } from '../services/FileService';
 import { uploadMiddleware, UploadedFile } from '../middleware/fileUpload';
 import { authMiddleware } from '../config/jwt';
@@ -9,9 +11,9 @@ export class FileController {
    */
   static async uploadFiles(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const messageId = req.body.messageId;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -19,7 +21,7 @@ export class FileController {
         });
         return;
       }
-      
+
       if (!messageId) {
         res.status(400).json({
           success: false,
@@ -27,7 +29,7 @@ export class FileController {
         });
         return;
       }
-      
+
       if (!req.files) {
         res.status(400).json({
           success: false,
@@ -35,13 +37,13 @@ export class FileController {
         });
         return;
       }
-      
-      const files = Array.isArray(req.files) 
-        ? req.files as unknown as UploadedFile[]
+
+      const files = Array.isArray(req.files)
+        ? (req.files as unknown as UploadedFile[])
         : [req.files as unknown as UploadedFile];
-      
+
       const uploadedFiles = [];
-      
+
       for (const file of files) {
         try {
           const fileMetadata = await FileService.uploadFile(
@@ -55,7 +57,7 @@ export class FileController {
           console.error('Error uploading file:', error);
         }
       }
-      
+
       if (uploadedFiles.length === 0) {
         res.status(400).json({
           success: false,
@@ -63,7 +65,7 @@ export class FileController {
         });
         return;
       }
-      
+
       res.status(201).json({
         success: true,
         data: {
@@ -79,15 +81,15 @@ export class FileController {
       });
     }
   }
-  
+
   /**
    * Download file
    */
   static async downloadFile(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const fileId = req.params.id;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -95,12 +97,12 @@ export class FileController {
         });
         return;
       }
-      
+
       const { file, canAccess } = await FileService.getFileForDownload(
         fileId,
         userId
       );
-      
+
       if (!file || !canAccess) {
         res.status(404).json({
           success: false,
@@ -108,8 +110,7 @@ export class FileController {
         });
         return;
       }
-      
-      const fs = require('fs');
+
       if (!fs.existsSync(file.filePath)) {
         res.status(404).json({
           success: false,
@@ -117,17 +118,17 @@ export class FileController {
         });
         return;
       }
-      
+
       res.setHeader('Content-Type', file.mimeType);
       res.setHeader('Content-Length', file.fileSize.toString());
       res.setHeader(
         'Content-Disposition',
         `attachment; filename="${file.originalName}"`
       );
-      
+
       const fileStream = fs.createReadStream(file.filePath);
       fileStream.pipe(res);
-      
+
       fileStream.on('error', () => {
         if (!res.headersSent) {
           res.status(500).json({
@@ -143,15 +144,15 @@ export class FileController {
       });
     }
   }
-  
+
   /**
    * Get file metadata
    */
   static async getFileMetadata(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const fileId = req.params.id;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -159,12 +160,12 @@ export class FileController {
         });
         return;
       }
-      
+
       const { file, canAccess } = await FileService.getFileForDownload(
         fileId,
         userId
       );
-      
+
       if (!file || !canAccess) {
         res.status(404).json({
           success: false,
@@ -172,7 +173,7 @@ export class FileController {
         });
         return;
       }
-      
+
       res.status(200).json({
         success: true,
         data: file,
@@ -180,19 +181,22 @@ export class FileController {
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to get file metadata',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to get file metadata',
       });
     }
   }
-  
+
   /**
    * Delete file
    */
   static async deleteFile(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const fileId = req.params.id;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -200,9 +204,9 @@ export class FileController {
         });
         return;
       }
-      
+
       const deleted = await FileService.deleteFile(fileId, userId);
-      
+
       if (!deleted) {
         res.status(404).json({
           success: false,
@@ -210,7 +214,7 @@ export class FileController {
         });
         return;
       }
-      
+
       res.status(200).json({
         success: true,
         message: 'File deleted successfully',
@@ -222,14 +226,14 @@ export class FileController {
       });
     }
   }
-  
+
   /**
    * Get user file statistics
    */
   static async getFileStats(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
-      
+      const userId = req.user?.id;
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -237,9 +241,9 @@ export class FileController {
         });
         return;
       }
-      
+
       const stats = await FileService.getFileStats(userId);
-      
+
       res.status(200).json({
         success: true,
         data: stats,
@@ -247,7 +251,8 @@ export class FileController {
     } catch (error) {
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to get file stats',
+        error:
+          error instanceof Error ? error.message : 'Failed to get file stats',
       });
     }
   }

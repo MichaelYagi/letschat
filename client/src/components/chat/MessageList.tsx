@@ -1,19 +1,23 @@
-import React, { useRef, useEffect } from 'react';
-import { Message } from '@/types/chat';
+import { useRef, useEffect } from 'react';
+import { Message } from '../types/chat';
 import { MessageBubble } from './MessageBubble';
 
 interface MessageListProps {
   messages: Message[];
   currentUser: { id: string };
   loading?: boolean;
-  onReply?: (messageId: string) => void;
+  onAddReaction?: (messageId: string, emoji: string) => void;
+  onRemoveReaction?: (messageId: string, emoji: string) => void;
+  onReadReceipt?: (messageId: string) => void;
 }
 
 export function MessageList({
   messages,
   currentUser,
   loading = false,
-  onReply,
+  onAddReaction,
+  onRemoveReaction,
+  onReadReceipt,
 }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastMessageRef = useRef<HTMLDivElement>(null);
@@ -92,6 +96,10 @@ export function MessageList({
                 isOwn={isOwn}
                 showAvatar={showAvatar}
                 showTimestamp={showTimestamp}
+                onAddReaction={onAddReaction}
+                onRemoveReaction={onRemoveReaction}
+                currentUserId={currentUser.id}
+                onReadReceipt={onReadReceipt}
               />
             </div>
           );

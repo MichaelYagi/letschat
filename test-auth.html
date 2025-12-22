@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Auth Test</title>
+  </head>
+  <body>
+    <h1>Testing Registration</h1>
+    <div id="result"></div>
+
+    <script>
+      async function testAuth() {
+        try {
+          const response = await fetch(
+            'http://localhost:3001/api/auth/register',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                username: 'test_user_' + Date.now(),
+                password: 'test_password',
+                displayName: 'Test User',
+              }),
+            }
+          );
+
+          const data = await response.json();
+          console.log('Registration response:', data);
+
+          if (response.ok && data.data) {
+            document.getElementById('result').innerHTML =
+              '✅ Registration successful: ' + JSON.stringify(data.data.user);
+
+            // Test storing token
+            localStorage.setItem(
+              'letschat_token',
+              data.data.tokens.accessToken
+            );
+            localStorage.setItem(
+              'letschat_user',
+              JSON.stringify(data.data.user)
+            );
+
+            // Test login
+            const loginResponse = await fetch(
+              'http://localhost:3001/api/auth/login',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  username: 'test_user_' + Date.now(),
+                  password: 'test_password',
+                }),
+              }
+            );
+
+            const loginData = await loginResponse.json();
+            console.log('Login response:', loginData);
+
+            if (loginResponse.ok) {
+              document.getElementById('result').innerHTML +=
+                '<br>✅ Login successful: ' +
+                JSON.stringify(loginData.data.user);
+            } else {
+              document.getElementById('result').innerHTML +=
+                '<br>❌ Login failed: ' + loginResponse.status;
+            }
+          } else {
+            document.getElementById('result').innerHTML =
+              '❌ Registration failed: ' +
+              response.status +
+              ' ' +
+              JSON.stringify(data);
+          }
+        } catch (error) {
+          console.error('Auth test error:', error);
+          document.getElementById('result').innerHTML =
+            '❌ Network error: ' + error.message;
+        }
+      }
+
+      testAuth();
+    </script>
+  </body>
+</html>

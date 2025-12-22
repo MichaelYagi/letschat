@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { config } from '../config';
 
 export class SecurityService {
@@ -23,7 +24,7 @@ export class SecurityService {
    * Generate a secure session token
    */
   static generateSessionToken(): string {
-    return require('crypto').randomBytes(32).toString('hex');
+    return crypto.randomBytes(32).toString('hex');
   }
 
   /**
@@ -91,7 +92,7 @@ export class SecurityService {
   static generateSecureFilename(originalName: string): string {
     const extension = originalName.split('.').pop();
     const timestamp = Date.now();
-    const random = require('crypto').randomBytes(8).toString('hex');
+    const random = crypto.randomBytes(8).toString('hex');
     return `${timestamp}_${random}.${extension}`;
   }
 

@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Smile, X, File } from 'lucide-react';
-import { filesApi } from '@/services/api';
-import { conversationsApi } from '@/services/api';
-import { useAuth } from '@/contexts/AuthContext';
+import { filesApi } from '../../services/api';
+import { conversationsApi } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface MessageInputProps {
   conversationId?: string;

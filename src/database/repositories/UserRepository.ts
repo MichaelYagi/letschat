@@ -125,7 +125,7 @@ export class UserRepository {
     return {
       id: user.id,
       username: user.username,
-      displayName: user.display_name,
+      displayName: user.display_name || user.username,
       avatarUrl: user.avatar_url,
       status: user.status,
       lastSeen: user.last_seen,

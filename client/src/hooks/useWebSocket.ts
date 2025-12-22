@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Message } from '@/types/chat';
-import { useAuth } from '@/contexts/AuthContext';
+import { Message } from '../types/chat';
+import { useAuth } from '../contexts/AuthContext';
 
 interface UseWebSocketReturn {
   socket: Socket | null;
@@ -44,7 +44,7 @@ export function useWebSocket(): UseWebSocketReturn {
       setConnected(false);
     });
 
-    newSocket.on('message_received', (message: Message) => {
+    newSocket.on('new_message', (message: Message) => {
       setMessages(prev => [...prev, message]);
     });
 
@@ -56,21 +56,81 @@ export function useWebSocket(): UseWebSocketReturn {
       setMessages(prev => prev.filter(m => m.id !== data.messageId));
     });
 
-    newSocket.on(
-      'user_typing',
-      (typingData: {
-        conversationId: string;
-        userId: string;
-        username: string;
-        isTyping: boolean;
-      }) => {
-        setTypingUsers(prev => {
-          const newTyping = new Set(prev);
-          if (typingData.isTyping && typingData.userId !== user?.id) {
-            newTyping.add(typingData.userId);
-          } else {
-            newTyping.delete(typingData.userId);
+    newSocket.on('message_reaction', (reactionData: any) => {
+      setMessages(prev =>
+        prev.map(m => {
+          if (m.id === reactionData.messageId) {
+            return {
+              ...m,
+              reactions: reactionData.reactions || [],
+            };
           }
+          return m;
+        })
+      );
+    });
+
+    newSocket.on('message_read', (readData: any) => {
+      setMessages(prev =>
+        prev.map(m => {
+          if (m.id === readData.messageId) {
+            return {
+              ...m,
+              isRead: true,
+            };
+          }
+          return m;
+        })
+      );
+    });
+
+    newSocket.on('conversation_read', (conversationReadData: any) => {
+      setMessages(prev =>
+        prev.map(m => {
+          if (
+            m.conversationId === conversationReadData.conversationId &&
+            m.senderId !== user?.id
+          ) {
+            return {
+              ...m,
+              isRead: true,
+            };
+          }
+          return m;
+        })
+      );
+    });
+
+    newSocket.on('delivery_status_updated', (deliveryData: any) => {
+      setMessages(prev =>
+        prev.map(m => {
+          if (m.id === deliveryData.messageId) {
+            return {
+              ...m,
+              deliveryStatus: deliveryData.status,
+            };
+          }
+          return m;
+        })
+      );
+    });
+
+    newSocket.on(
+      'typing',
+      (
+        typingEvents: Array<{
+          conversationId: string;
+          userId: string;
+          isTyping: boolean;
+        }>
+      ) => {
+        setTypingUsers(() => {
+          const newTyping = new Set<string>();
+          typingEvents.forEach(event => {
+            if (event.isTyping && event.userId !== user?.id) {
+              newTyping.add(event.userId);
+            }
+          });
           return newTyping;
         });
       }
@@ -122,8 +182,7 @@ export function useWebSocket(): UseWebSocketReturn {
   const sendTyping = useCallback(
     (conversationId: string, isTyping: boolean) => {
       if (!socket) return;
-      const event = isTyping ? 'typing_start' : 'typing_stop';
-      socket.emit(event, { conversationId });
+      socket.emit('typing', { conversationId, isTyping });
     },
     [socket]
   );

@@ -6,25 +6,25 @@ const runMigrationsCLI = async () => {
   try {
     console.log('Checking database connection...');
     const isDbConnected = await pingDatabase();
-    
+
     if (!isDbConnected) {
       console.error('❌ Database connection failed');
       process.exit(1);
     }
-    
+
     console.log('✅ Database connection successful');
     console.log('Running migrations...');
-    
+
     await runMigrations();
-    
+
     console.log('✅ All migrations completed successfully');
-    
+
     const status = await getMigrationStatus();
     console.log(`\nMigration status (${status.length} migrations run):`);
     status.forEach(migration => {
       console.log(`  - ${migration.migration} at ${migration.run_at}`);
     });
-    
+
     process.exit(0);
   } catch (error) {
     console.error('❌ Migration failed:', error);
@@ -35,7 +35,7 @@ const runMigrationsCLI = async () => {
 const pingDatabaseCLI = async () => {
   try {
     const isDbConnected = await pingDatabase();
-    
+
     if (isDbConnected) {
       console.log('✅ Database connection successful');
       process.exit(0);
@@ -52,17 +52,17 @@ const pingDatabaseCLI = async () => {
 const statusDatabaseCLI = async () => {
   try {
     const isDbConnected = await pingDatabase();
-    
+
     if (!isDbConnected) {
       console.error('❌ Database connection failed');
       process.exit(1);
     }
-    
+
     const status = await getMigrationStatus();
-    
+
     console.log('✅ Database connection successful');
     console.log(`\nMigration status (${status.length} migrations run):`);
-    
+
     if (status.length === 0) {
       console.log('  No migrations have been run');
     } else {
@@ -70,7 +70,7 @@ const statusDatabaseCLI = async () => {
         console.log(`  - ${migration.migration} at ${migration.run_at}`);
       });
     }
-    
+
     process.exit(0);
   } catch (error) {
     console.error('❌ Status check failed:', error);

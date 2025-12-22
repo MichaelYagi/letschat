@@ -1,6 +1,11 @@
 import { Request, Response } from 'express';
 import { MessageService } from '../services/MessageService';
-import { CreateMessageRequest, UpdateMessageRequest, CreateConversationRequest, AddParticipantRequest } from '../types/Message';
+import {
+  CreateMessageRequest,
+  UpdateMessageRequest,
+  CreateConversationRequest,
+  AddParticipantRequest,
+} from '../types/Message';
 
 export class MessageController {
   /**
@@ -8,8 +13,8 @@ export class MessageController {
    */
   static async getConversations(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
-      
+      const userId = req.user?.id;
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -17,9 +22,9 @@ export class MessageController {
         });
         return;
       }
-      
+
       const conversations = await MessageService.getConversations(userId);
-      
+
       res.status(200).json({
         success: true,
         data: conversations,
@@ -31,15 +36,15 @@ export class MessageController {
       });
     }
   }
-  
+
   /**
    * Create conversation
    */
   static async createConversation(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const conversationData: CreateConversationRequest = req.body;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -47,9 +52,12 @@ export class MessageController {
         });
         return;
       }
-      
-      const conversation = await MessageService.createConversation(conversationData, userId);
-      
+
+      const conversation = await MessageService.createConversation(
+        conversationData,
+        userId
+      );
+
       res.status(201).json({
         success: true,
         data: conversation,
@@ -57,21 +65,26 @@ export class MessageController {
     } catch (error) {
       res.status(400).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to create conversation',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to create conversation',
       });
     }
   }
-  
+
   /**
    * Get conversation messages
    */
   static async getMessages(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const conversationId = req.params.conversationId;
       const limit = parseInt(req.query.limit as string) || 50;
-      const before = req.query.before ? new Date(req.query.before as string) : undefined;
-      
+      const before = req.query.before
+        ? new Date(req.query.before as string)
+        : undefined;
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -79,9 +92,14 @@ export class MessageController {
         });
         return;
       }
-      
-      const messages = await MessageService.getMessages(conversationId, userId, limit, before);
-      
+
+      const messages = await MessageService.getMessages(
+        conversationId,
+        userId,
+        limit,
+        before
+      );
+
       res.status(200).json({
         success: true,
         data: messages,
@@ -89,19 +107,20 @@ export class MessageController {
     } catch (error) {
       res.status(400).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to get messages',
+        error:
+          error instanceof Error ? error.message : 'Failed to get messages',
       });
     }
   }
-  
+
   /**
    * Send message
    */
   static async sendMessage(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const messageData: CreateMessageRequest = req.body;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -109,9 +128,12 @@ export class MessageController {
         });
         return;
       }
-      
-      const messageEvent = await MessageService.sendMessage(messageData, userId);
-      
+
+      const messageEvent = await MessageService.sendMessage(
+        messageData,
+        userId
+      );
+
       res.status(201).json({
         success: true,
         data: messageEvent,
@@ -119,20 +141,21 @@ export class MessageController {
     } catch (error) {
       res.status(400).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to send message',
+        error:
+          error instanceof Error ? error.message : 'Failed to send message',
       });
     }
   }
-  
+
   /**
    * Edit message
    */
   static async editMessage(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const messageId = req.params.messageId;
       const updates: UpdateMessageRequest = req.body;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -140,9 +163,13 @@ export class MessageController {
         });
         return;
       }
-      
-      const message = await MessageService.editMessage(messageId, updates, userId);
-      
+
+      const message = await MessageService.editMessage(
+        messageId,
+        updates,
+        userId
+      );
+
       res.status(200).json({
         success: true,
         data: message,
@@ -150,19 +177,20 @@ export class MessageController {
     } catch (error) {
       res.status(400).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to edit message',
+        error:
+          error instanceof Error ? error.message : 'Failed to edit message',
       });
     }
   }
-  
+
   /**
    * Delete message
    */
   static async deleteMessage(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const messageId = req.params.messageId;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -170,9 +198,9 @@ export class MessageController {
         });
         return;
       }
-      
+
       const deleted = await MessageService.deleteMessage(messageId, userId);
-      
+
       if (!deleted) {
         res.status(404).json({
           success: false,
@@ -180,7 +208,7 @@ export class MessageController {
         });
         return;
       }
-      
+
       res.status(200).json({
         success: true,
         message: 'Message deleted successfully',
@@ -188,19 +216,20 @@ export class MessageController {
     } catch (error) {
       res.status(400).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete message',
+        error:
+          error instanceof Error ? error.message : 'Failed to delete message',
       });
     }
   }
-  
+
   /**
    * Add participants to conversation
    */
   static async addParticipants(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const data: AddParticipantRequest = req.body;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -208,9 +237,9 @@ export class MessageController {
         });
         return;
       }
-      
+
       await MessageService.addParticipants(data, userId);
-      
+
       res.status(200).json({
         success: true,
         message: 'Participants added successfully',
@@ -218,19 +247,20 @@ export class MessageController {
     } catch (error) {
       res.status(400).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to add participants',
+        error:
+          error instanceof Error ? error.message : 'Failed to add participants',
       });
     }
   }
-  
+
   /**
    * Remove participant from conversation
    */
   static async removeParticipant(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const { conversationId, participantId } = req.body;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -238,9 +268,13 @@ export class MessageController {
         });
         return;
       }
-      
-      await MessageService.removeParticipant(conversationId, participantId || userId, userId);
-      
+
+      await MessageService.removeParticipant(
+        conversationId,
+        participantId || userId,
+        userId
+      );
+
       res.status(200).json({
         success: true,
         message: 'Participant removed successfully',
@@ -248,19 +282,22 @@ export class MessageController {
     } catch (error) {
       res.status(400).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to remove participant',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to remove participant',
       });
     }
   }
-  
+
   /**
    * Mark messages as read
    */
   static async markAsRead(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const { conversationId } = req.body;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -268,9 +305,9 @@ export class MessageController {
         });
         return;
       }
-      
+
       await MessageService.markAsRead(conversationId, userId);
-      
+
       res.status(200).json({
         success: true,
         message: 'Messages marked as read',

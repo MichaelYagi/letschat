@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { conversationsApi } from '@/services/api';
-import { Message, Phone, Users, Plus } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState, useEffect } from 'react';
+import { conversationsApi } from '../../services/api';
+import { MessageCircle, Users } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { formatDistanceToNow } from 'date-fns';
 
 interface Conversation {
   id: string;
@@ -9,7 +10,7 @@ interface Conversation {
   name: string | null;
   participant?: {
     username: string;
-    displayName: string;
+    displayName?: string;
     status: string;
   } | null;
   lastMessage?: {
@@ -22,14 +23,12 @@ interface Conversation {
 
 interface ConversationListProps {
   selectedConversationId?: string;
-  onConversationSelect: (conversationId: string) => void;
-  onNewConversation: () => void;
+  onConversationSelect?: (conversationId: string) => void;
 }
 
 export function ConversationList({
   selectedConversationId,
   onConversationSelect,
-  onNewConversation,
 }: ConversationListProps) {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -53,11 +52,22 @@ export function ConversationList({
   const formatLastMessage = (lastMessage: any) => {
     if (!lastMessage) return 'No messages';
 
-    const senderName = lastMessage.senderId === user?.id ? 'You' : 'They';
-    const content =
-      lastMessage.content.length > 30
-        ? lastMessage.content.substring(0, 30) + '...'
-        : lastMessage.content;
+    const senderName =
+      lastMessage.senderId === user?.id
+        ? 'You'
+        : lastMessage.sender?.displayName ||
+          lastMessage.sender?.username ||
+          'They';
+
+    let content = '';
+    if (lastMessage.contentType === 'file') {
+      content = `📎 ${lastMessage.fileData?.filename || 'Shared a file'}`;
+    } else {
+      content =
+        lastMessage.content.length > 35
+          ? lastMessage.content.substring(0, 35) + '...'
+          : lastMessage.content;
+    }
 
     return `${senderName}: ${content}`;
   };
@@ -93,23 +103,14 @@ export function ConversationList({
     <div className='flex flex-col h-full'>
       {/* Header */}
       <div className='p-4 border-b border-gray-200 bg-white'>
-        <div className='flex items-center justify-between'>
-          <h2 className='text-lg font-semibold text-gray-900'>Conversations</h2>
-          <button
-            onClick={onNewConversation}
-            className='p-2 text-primary-600 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-full'
-            title='New conversation'
-          >
-            <Plus size={20} />
-          </button>
-        </div>
+        <h2 className='text-lg font-semibold text-gray-900'>Conversations</h2>
       </div>
 
       {/* Conversation List */}
       <div className='flex-1 overflow-y-auto'>
         {conversations.length === 0 ? (
           <div className='p-4 text-center text-gray-500'>
-            <Message className='w-8 h-8 mx-auto mb-2 text-gray-400' />
+            <MessageCircle className='w-8 h-8 mx-auto mb-2 text-gray-400' />
             <p>No conversations yet</p>
             <p className='text-sm'>Start a new conversation!</p>
           </div>
@@ -118,7 +119,7 @@ export function ConversationList({
             {conversations.map(conversation => (
               <div
                 key={conversation.id}
-                onClick={() => onConversationSelect(conversation.id)}
+                onClick={() => onConversationSelect?.(conversation.id)}
                 className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
                   selectedConversationId === conversation.id
                     ? 'bg-primary-50 border-l-4 border-primary-600'
@@ -132,10 +133,12 @@ export function ConversationList({
                       <div className='w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center'>
                         <Users size={20} className='text-gray-600' />
                       </div>
-                    ) : conversation.participant ? (
+                    ) : conversation.participant &&
+                      Array.isArray(conversation.participant) &&
+                      conversation.participant.length > 0 ? (
                       <div className='w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-white font-medium'>
-                        {conversation.participant.displayName[0]?.toUpperCase() ||
-                          conversation.participant.username[0]?.toUpperCase()}
+                        {conversation.participant[0]?.displayName?.toUpperCase() ||
+                          conversation.participant[0]?.username?.toUpperCase()}
                       </div>
                     ) : (
                       <div className='w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center'>
@@ -147,23 +150,49 @@ export function ConversationList({
                   {/* Content */}
                   <div className='flex-1 min-w-0'>
                     <div className='flex items-center justify-between'>
-                      <h3 className='font-medium text-gray-900 truncate'>
-                        {getConversationName(conversation)}
-                      </h3>
                       <div className='flex items-center space-x-2'>
+                        <h3 className='font-medium text-gray-900 truncate'>
+                          {getConversationName(conversation)}
+                        </h3>
                         {conversation.type === 'direct' &&
-                          conversation.participant &&
-                          getStatusIndicator(conversation.participant.status)}
+                          conversation.participant && (
+                            <div className='flex items-center'>
+                              {getStatusIndicator(
+                                conversation.participant.status
+                              )}
+                              <span className='ml-1 text-xs text-gray-500'>
+                                {conversation.participant.status === 'online'
+                                  ? ''
+                                  : conversation.participant.status ===
+                                      'offline'
+                                    ? 'offline'
+                                    : 'away'}
+                              </span>
+                            </div>
+                          )}
+                      </div>
+                      <div className='flex items-center space-x-2'>
                         {conversation.unreadCount > 0 && (
-                          <span className='bg-primary-600 text-white text-xs px-2 py-1 rounded-full'>
+                          <span className='bg-primary-600 text-white text-xs px-2 py-1 rounded-full font-medium'>
                             {conversation.unreadCount}
                           </span>
                         )}
                       </div>
                     </div>
-                    <p className='text-sm text-gray-500 truncate'>
-                      {formatLastMessage(conversation.lastMessage)}
-                    </p>
+
+                    {conversation.lastMessage && (
+                      <div className='mt-1 space-y-1'>
+                        <div className='text-sm text-gray-600 truncate'>
+                          {formatLastMessage(conversation.lastMessage)}
+                        </div>
+                        <div className='text-xs text-gray-400'>
+                          {formatDistanceToNow(
+                            new Date(conversation.lastMessage.createdAt),
+                            { addSuffix: true }
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

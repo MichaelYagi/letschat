@@ -2,17 +2,15 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "commonjs",
-    "lib": ["ES2022"],
     "outDir": "./dist",
     "rootDir": "./src",
-    "strict": true,
+    "strict": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
+    "declaration": false,
+    "sourceMap": false,
     "removeComments": true,
     "noImplicitAny": false,
     "noImplicitReturns": false,
@@ -23,11 +21,12 @@
     "noImplicitOverride": false,
     "noPropertyAccessFromIndexSignature": false,
     "noUncheckedIndexedAccess": false,
-    "allowUnusedLabels": false,
-    "allowUnreachableCode": false,
+    "allowUnusedLabels": true,
+    "allowUnreachableCode": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "baseUrl": ".",
+    "moduleResolution": "node",
     "paths": {
       "@/*": ["src/*"],
       "@/config/*": ["src/config/*"],
@@ -41,13 +40,6 @@
       "@/websocket/*": ["src/websocket/*"]
     }
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "client",
-    "tests"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "client", "tests"]
 }

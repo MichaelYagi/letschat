@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🔍 Direct Frontend Test</title>
+    <style>
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        margin: 20px;
+        background: #f8fafc;
+      }
+      .test-container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+      .test-section {
+        margin-bottom: 20px;
+        padding: 15px;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+      }
+      .result {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+      }
+      .error {
+        background: #fee2e2;
+        color: #dc2626;
+      }
+      .success {
+        background: #d1fae5;
+        color: #065f46;
+      }
+      .code {
+        background: #1f2937;
+        color: #10b981;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      button {
+        background: #3b82f6;
+        color: white;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      input {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+      }
+      .step {
+        font-weight: 600;
+        color: #374151;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="test-container">
+      <h1>🔍 Real Frontend Interface Test</h1>
+
+      <div class="test-section">
+        <div class="step">Step 1: Test Registration Page</div>
+        <div id="registration-result"></div>
+      </div>
+
+      <div class="test-section">
+        <div class="step">Step 2: Test Login Page</div>
+        <div id="login-result"></div>
+      </div>
+
+      <div class="test-section">
+        <div class="step">Step 3: Test Authenticated Page</div>
+        <div id="authenticated-result"></div>
+      </div>
+
+      <div class="test-section">
+        <div class="step">Step 4: Database Verification</div>
+        <div id="database-result"></div>
+        <div id="database-content"></div>
+      </div>
+
+      <div class="test-section">
+        <button onclick="runAllTests()">🧪 Run Complete Frontend Test</button>
+        <button onclick="checkDatabase()">📊 Check Database State</button>
+      </div>
+
+      <div id="final-result" class="result" style="display: none"></div>
+    </div>
+
+    <script>
+      async function testPageLoad(url, elementId, testName) {
+          try {
+              const response = await fetch(url, {
+                  headers: { 'Accept': 'text/html' }
+              });
+
+              const resultElement = document.getElementById(elementId);
+              if (response.ok) {
+                  resultElement.className = 'result success';
+                  resultElement.innerHTML = `✅ <strong>${testName}</strong> page loads successfully (Status: ${response.status})`;
+              } else {
+                  resultElement.className = 'result error';
+                  resultElement.innerHTML = `❌ <strong>${testName}</strong> page failed (Status: ${response.status})`;
+              }
+
+              return response.ok;
+          } catch (error) {
+              resultElement.className = 'result error';
+              resultElement.innerHTML = `❌ <strong>${testName}</strong> network error: ${error.message}`;
+              return false;
+          }
+      }
+
+      async function testRegistration() {
+          console.log('🔍 Testing registration page...');
+          const success = await testPageLoad('http://localhost:3001/register', 'registration-result', 'Registration');
+
+          if (success) {
+              console.log('✅ Registration page is accessible');
+              // Now test form submission
+              setTimeout(() => testRegistrationSubmit(), 1000);
+          }
+      }
+
+      async function testLogin() {
+          console.log('🔍 Testing login page...');
+          const success = await testPageLoad('http://localhost:3001/login', 'login-result', 'Login');
+
+          if (success) {
+              console.log('✅ Login page is accessible');
+              // Now test form submission
+              setTimeout(() => testLoginSubmit(), 1000);
+          }
+      }
+
+      async function testRegistrationSubmit() {
+          console.log('📝 Testing registration form submission...');
+
+          // Create a test user
+          const testUser = {
+              username: `test_user_${Date.now()}`,
+              password: 'TestPassword123!',
+              displayName: 'Test User Direct'
+          };
+
+          try {
+              const response = await fetch('http://localhost:3000/api/auth/register', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(testUser)
+              });
+
+              const data = await response.json();
+
+              if (response.status === 201 && data.data && data.data.user) {
+                  console.log('✅ Registration API call successful:', data.data.user);
+
+                  // Test if redirected to login page
+                  setTimeout(async () => {
+                      const loginResponse = await fetch('http://localhost:3001/login', {
+                          headers: { 'Accept': 'text/html' },
+                          redirect: 'manual'
+                      });
+
+                      if (loginResponse.url && loginResponse.url.includes('/login')) {
+                          console.log('✅ Registration redirects to login page');
+                      } else {
+                          console.log('⚠️ Registration does NOT redirect to login page');
+                      }
+                  }, 2000);
+              } else {
+                  console.log('❌ Registration API failed:', data.error || 'Unknown error');
+              }
+          } catch (error) {
+              console.error('❌ Registration submission error:', error);
+          }
+      }
+
+      async function testLoginSubmit() {
+          console.log('🔑 Testing login form submission...');
+
+          // Login with the previously created user
+          const testUser = {
+              username: `test_user_${Date.now()}`,
+              password: 'TestPassword123!'
+          };
+
+          try {
+              const response = await fetch('http://localhost:3000/api/auth/login', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(testUser)
+              });
+
+              const data = await response.json();
+
+              if (response.status === 200 && data.data && data.data.user) {
+                  console.log('✅ Login API call successful:', data.data.user);
+
+                  // Test if redirected to main page
+                  setTimeout(async () => {
+                      const mainResponse = await fetch('http://localhost:3001/', {
+                          headers: { 'Accept': 'text/html' }
+                      });
+
+                      if (mainResponse.url && mainResponse.url === 'http://localhost:3001/') {
+                          console.log('✅ Login redirects to main page');
+
+                          // Test authenticated page
+                          setTimeout(() => testAuthenticatedPage(), 2000);
+                      } else {
+                          console.log('⚠️ Login does NOT redirect to main page');
+                      }
+                  }, 2000);
+              } else {
+                  console.log('❌ Login API failed:', data.error || 'Unknown error');
+              }
+          } catch (error) {
+              console.error('❌ Login submission error:', error);
+          }
+      }
+
+      async function testAuthenticatedPage() {
+          console.log('🏠 Testing authenticated page...');
+
+          try {
+              const response = await fetch('http://localhost:3001/', {
+                  headers: { 'Accept': 'text/html' }
+              });
+
+              const success = response.ok;
+
+              const resultElement = document.getElementById('authenticated-result');
+              if (success) {
+                  resultElement.className = 'result success';
+                  resultElement.innerHTML = `✅ <strong>Authenticated Page</strong> loads successfully (Status: ${response.status})`;
+
+                  // Check if there are any JavaScript errors on the page
+                  const hasErrors = await checkForJavaScriptErrors(response);
+                  if (hasErrors) {
+                      resultElement.innerHTML += '<br><div class="error">⚠️ JavaScript errors detected on authenticated page</div>';
+                  }
+              } else {
+                  resultElement.className = 'result error';
+                  resultElement.innerHTML = `❌ <strong>Authenticated Page</strong> failed (Status: ${response.status})`;
+              }
+          } catch (error) {
+              const resultElement = document.getElementById('authenticated-result');
+              resultElement.className = 'result error';
+              resultElement.innerHTML = `❌ <strong>Authenticated Page</strong> network error: ${error.message}`;
+          }
+      }
+
+      async function checkForJavaScriptErrors(response) {
+          try {
+              // Get the page content
+              const html = await response.text();
+
+              // Look for common error indicators
+              const errorIndicators = [
+                  'React error',
+                  'TypeError:',
+                  'ReferenceError:',
+                  'Error:',
+                  'Cannot read prop',
+                  'Invalid hook call'
+              ];
+
+              for (const indicator of errorIndicators) {
+                  if (html.includes(indicator)) {
+                      console.log(`❌ JavaScript error detected: ${indicator}`);
+                      return true;
+                  }
+              }
+
+              // Look for specific React errors
+              if (html.includes('RegisterForm') && html.includes('displayName')) {
+                  console.log('❌ RegisterForm.displayName error detected');
+                  return true;
+              }
+
+              return false;
+          } catch (error) {
+              console.error('Error checking JavaScript:', error);
+              return false;
+          }
+      }
+
+      async function runAllTests() {
+          console.log('🧪 Starting complete frontend test...');
+          document.getElementById('final-result').style.display = 'block';
+          document.getElementById('final-result').innerHTML = '<div class="code">Running comprehensive test...</div>';
+
+          await testRegistration();
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          await testLogin();
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          document.getElementById('final-result').innerHTML = '<div class="success">✅ All tests completed! Check browser console for results.</div>';
+      }
+
+      async function checkDatabase() {
+          console.log('📊 Checking database state...');
+
+          try {
+              const response = await fetch('http://localhost:3000/api/user-count');
+              const data = await response.json();
+
+              const dbElement = document.getElementById('database-result');
+              const dbContentElement = document.getElementById('database-content');
+
+              if (response.ok) {
+                  dbElement.className = 'result success';
+                  dbElement.innerHTML = `✅ Database query successful: ${data.userCount} users`;
+
+                  // Try to get recent users
+                  try {
+                      const usersResponse = await fetch('http://localhost:3000/api/recent-users');
+                      const usersData = await usersResponse.json();
+
+                      if (usersResponse.ok && usersData.users) {
+                          let userTable = '<table border="1" style="width:100%; margin-top:10px;"><tr><th>ID</th><th>Username</th><th>Display Name</th><th>Status</th><th>Created</th></tr>';
+                          for (const user of usersData.users) {
+                              userTable += `<tr><td class="code">${user.id}</td><td>${user.username}</td><td>${user.display_name || user.username}</td><td>${user.status}</td><td>${user.created_at}</td></tr>`;
+                          }
+                          userTable += '</table>';
+
+                          dbContentElement.innerHTML = userTable;
+                      } else {
+                          dbElement.innerHTML += '<br><div class="error">Could not fetch user details</div>';
+                      }
+                  } else {
+                      dbElement.innerHTML += '<br><div class="error">Could not fetch user list</div>';
+                  }
+              } catch (fetchError) {
+                  dbElement.innerHTML += `<br><div class="error">User list fetch error: ${fetchError.message}</div>`;
+              }
+              } else {
+                  dbElement.className = 'result error';
+                  dbElement.innerHTML = `❌ Database query failed: ${response.status}`;
+              }
+          } catch (error) {
+              const dbElement = document.getElementById('database-result');
+              dbElement.className = 'result error';
+              dbElement.innerHTML = `❌ Database check error: ${error.message}`;
+          }
+      }
+
+      // Auto-run tests
+      window.onload = () => {
+          setTimeout(runAllTests, 1000);
+      };
+    </script>
+  </body>
+</html>

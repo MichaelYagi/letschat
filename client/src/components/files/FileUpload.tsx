@@ -7,7 +7,7 @@ import {
   Film,
   FileText,
 } from 'lucide-react';
-import { FileUploadProps } from '@/types/files';
+import { FileUploadProps } from '../types/files';
 
 export function FileUpload({
   onUpload,

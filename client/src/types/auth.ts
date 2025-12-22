@@ -2,9 +2,12 @@ export interface User {
   id: string;
   username: string;
   displayName?: string;
+  email?: string;
+  bio?: string;
   avatarUrl?: string;
   status: 'online' | 'offline' | 'away' | 'busy';
   lastSeen: string;
+  createdAt?: string;
 }
 
 export interface LoginCredentials {

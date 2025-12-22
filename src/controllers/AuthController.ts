@@ -1,6 +1,10 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/AuthService';
-import { CreateUserRequest, LoginRequest, UpdateUserRequest } from '../types/User';
+import {
+  CreateUserRequest,
+  LoginRequest,
+  UpdateUserRequest,
+} from '../types/User';
 
 export class AuthController {
   /**
@@ -10,7 +14,7 @@ export class AuthController {
     try {
       const userData: CreateUserRequest = req.body;
       const result = await AuthService.register(userData);
-      
+
       res.status(201).json({
         success: true,
         data: result,
@@ -22,7 +26,7 @@ export class AuthController {
       });
     }
   }
-  
+
   /**
    * Login user
    */
@@ -31,9 +35,9 @@ export class AuthController {
       const loginData: LoginRequest = req.body;
       const deviceInfo = req.headers['user-agent'];
       const ipAddress = req.ip;
-      
+
       const result = await AuthService.login(loginData, deviceInfo, ipAddress);
-      
+
       res.status(200).json({
         success: true,
         data: result,
@@ -45,14 +49,14 @@ export class AuthController {
       });
     }
   }
-  
+
   /**
    * Logout user
    */
   static async logout(req: Request, res: Response): Promise<void> {
     try {
       const authHeader = req.headers.authorization;
-      
+
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         res.status(400).json({
           success: false,
@@ -60,10 +64,10 @@ export class AuthController {
         });
         return;
       }
-      
+
       const token = authHeader.substring(7);
       await AuthService.logout(token);
-      
+
       res.status(200).json({
         success: true,
         message: 'Logged out successfully',
@@ -75,14 +79,14 @@ export class AuthController {
       });
     }
   }
-  
+
   /**
    * Logout from all devices
    */
   static async logoutAll(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
-      
+      const userId = req.user?.id;
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -90,9 +94,9 @@ export class AuthController {
         });
         return;
       }
-      
+
       await AuthService.logoutAllDevices(userId);
-      
+
       res.status(200).json({
         success: true,
         message: 'Logged out from all devices',
@@ -104,14 +108,14 @@ export class AuthController {
       });
     }
   }
-  
+
   /**
    * Verify token
    */
   static async verify(req: Request, res: Response): Promise<void> {
     try {
       const authHeader = req.headers.authorization;
-      
+
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         res.status(400).json({
           success: false,
@@ -119,10 +123,10 @@ export class AuthController {
         });
         return;
       }
-      
+
       const token = authHeader.substring(7);
       const result = await AuthService.verifyToken(token);
-      
+
       res.status(200).json({
         success: true,
         data: result,
@@ -134,14 +138,14 @@ export class AuthController {
       });
     }
   }
-  
+
   /**
    * Get current user profile
    */
   static async profile(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
-      
+      const userId = req.user?.id;
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -149,9 +153,9 @@ export class AuthController {
         });
         return;
       }
-      
+
       const user = await AuthService.getProfile(userId);
-      
+
       if (!user) {
         res.status(404).json({
           success: false,
@@ -159,7 +163,7 @@ export class AuthController {
         });
         return;
       }
-      
+
       res.status(200).json({
         success: true,
         data: user,
@@ -171,15 +175,15 @@ export class AuthController {
       });
     }
   }
-  
+
   /**
    * Update user profile
    */
   static async updateProfile(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const updates: UpdateUserRequest = req.body;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -187,9 +191,9 @@ export class AuthController {
         });
         return;
       }
-      
+
       const user = await AuthService.updateProfile(userId, updates);
-      
+
       res.status(200).json({
         success: true,
         data: user,
@@ -201,7 +205,7 @@ export class AuthController {
       });
     }
   }
-  
+
   /**
    * Search users
    */
@@ -209,7 +213,7 @@ export class AuthController {
     try {
       const query = req.query.q as string;
       const limit = parseInt(req.query.limit as string) || 20;
-      
+
       if (!query || typeof query !== 'string') {
         res.status(400).json({
           success: false,
@@ -217,9 +221,9 @@ export class AuthController {
         });
         return;
       }
-      
+
       const users = await AuthService.searchUsers(query, Math.min(limit, 50));
-      
+
       res.status(200).json({
         success: true,
         data: users,

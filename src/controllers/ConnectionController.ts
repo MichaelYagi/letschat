@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import { ConnectionService } from '../services/ConnectionService';
-import { CreateConnectionRequest, ConnectionRequestResponse } from '../types/Connection';
+import {
+  CreateConnectionRequest,
+  ConnectionRequestResponse,
+} from '../types/Connection';
 
 export class ConnectionController {
   /**
@@ -8,9 +11,9 @@ export class ConnectionController {
    */
   static async sendRequest(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const requestData: CreateConnectionRequest = req.body;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -18,7 +21,7 @@ export class ConnectionController {
         });
         return;
       }
-      
+
       if (!requestData.username) {
         res.status(400).json({
           success: false,
@@ -26,9 +29,12 @@ export class ConnectionController {
         });
         return;
       }
-      
-      const connection = await ConnectionService.sendRequest(userId, requestData);
-      
+
+      const connection = await ConnectionService.sendRequest(
+        userId,
+        requestData
+      );
+
       res.status(201).json({
         success: true,
         data: connection,
@@ -36,18 +42,21 @@ export class ConnectionController {
     } catch (error) {
       res.status(400).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to send connection request',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to send connection request',
       });
     }
   }
-  
+
   /**
    * Get pending connection requests
    */
   static async getPendingRequests(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
-      
+      const userId = req.user?.id;
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -55,9 +64,9 @@ export class ConnectionController {
         });
         return;
       }
-      
+
       const requests = await ConnectionService.getPendingRequests(userId);
-      
+
       res.status(200).json({
         success: true,
         data: requests,
@@ -69,14 +78,14 @@ export class ConnectionController {
       });
     }
   }
-  
+
   /**
    * Get user's connections
    */
   static async getConnections(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
-      
+      const userId = req.user?.id;
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -84,9 +93,9 @@ export class ConnectionController {
         });
         return;
       }
-      
+
       const connections = await ConnectionService.getConnections(userId);
-      
+
       res.status(200).json({
         success: true,
         data: connections,
@@ -98,15 +107,15 @@ export class ConnectionController {
       });
     }
   }
-  
+
   /**
    * Get connection status with user
    */
   static async getConnectionStatus(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const username = req.query.username as string;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -114,7 +123,7 @@ export class ConnectionController {
         });
         return;
       }
-      
+
       if (!username) {
         res.status(400).json({
           success: false,
@@ -122,9 +131,12 @@ export class ConnectionController {
         });
         return;
       }
-      
-      const status = await ConnectionService.getConnectionStatus(userId, username);
-      
+
+      const status = await ConnectionService.getConnectionStatus(
+        userId,
+        username
+      );
+
       res.status(200).json({
         success: true,
         data: status,
@@ -132,19 +144,22 @@ export class ConnectionController {
     } catch (error) {
       res.status(400).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to get connection status',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to get connection status',
       });
     }
   }
-  
+
   /**
    * Accept connection request
    */
   static async acceptRequest(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const { connectionId } = req.body;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -152,7 +167,7 @@ export class ConnectionController {
         });
         return;
       }
-      
+
       if (!connectionId) {
         res.status(400).json({
           success: false,
@@ -160,9 +175,12 @@ export class ConnectionController {
         });
         return;
       }
-      
-      const connection = await ConnectionService.acceptRequest(connectionId, userId);
-      
+
+      const connection = await ConnectionService.acceptRequest(
+        connectionId,
+        userId
+      );
+
       res.status(200).json({
         success: true,
         data: connection,
@@ -170,19 +188,20 @@ export class ConnectionController {
     } catch (error) {
       res.status(400).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to accept request',
+        error:
+          error instanceof Error ? error.message : 'Failed to accept request',
       });
     }
   }
-  
+
   /**
    * Decline connection request
    */
   static async declineRequest(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const { connectionId } = req.body;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -190,7 +209,7 @@ export class ConnectionController {
         });
         return;
       }
-      
+
       if (!connectionId) {
         res.status(400).json({
           success: false,
@@ -198,9 +217,12 @@ export class ConnectionController {
         });
         return;
       }
-      
-      const connection = await ConnectionService.declineRequest(connectionId, userId);
-      
+
+      const connection = await ConnectionService.declineRequest(
+        connectionId,
+        userId
+      );
+
       res.status(200).json({
         success: true,
         data: connection,
@@ -208,19 +230,20 @@ export class ConnectionController {
     } catch (error) {
       res.status(400).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to decline request',
+        error:
+          error instanceof Error ? error.message : 'Failed to decline request',
       });
     }
   }
-  
+
   /**
    * Remove connection
    */
   static async removeConnection(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const { connectionId } = req.body;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -228,7 +251,7 @@ export class ConnectionController {
         });
         return;
       }
-      
+
       if (!connectionId) {
         res.status(400).json({
           success: false,
@@ -236,9 +259,9 @@ export class ConnectionController {
         });
         return;
       }
-      
+
       await ConnectionService.removeConnection(connectionId, userId);
-      
+
       res.status(200).json({
         success: true,
         message: 'Connection removed successfully',
@@ -246,19 +269,22 @@ export class ConnectionController {
     } catch (error) {
       res.status(400).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to remove connection',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to remove connection',
       });
     }
   }
-  
+
   /**
    * Block user
    */
   static async blockUser(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const { username } = req.body;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -266,7 +292,7 @@ export class ConnectionController {
         });
         return;
       }
-      
+
       if (!username) {
         res.status(400).json({
           success: false,
@@ -274,9 +300,9 @@ export class ConnectionController {
         });
         return;
       }
-      
+
       const connection = await ConnectionService.blockUser(userId, username);
-      
+
       res.status(200).json({
         success: true,
         data: connection,
@@ -288,15 +314,15 @@ export class ConnectionController {
       });
     }
   }
-  
+
   /**
    * Unblock user
    */
   static async unblockUser(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const { username } = req.body;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -304,7 +330,7 @@ export class ConnectionController {
         });
         return;
       }
-      
+
       if (!username) {
         res.status(400).json({
           success: false,
@@ -312,9 +338,9 @@ export class ConnectionController {
         });
         return;
       }
-      
+
       const unblocked = await ConnectionService.unblockUser(userId, username);
-      
+
       res.status(200).json({
         success: true,
         data: { unblocked },
@@ -322,18 +348,19 @@ export class ConnectionController {
     } catch (error) {
       res.status(400).json({
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to unblock user',
+        error:
+          error instanceof Error ? error.message : 'Failed to unblock user',
       });
     }
   }
-  
+
   /**
    * Get blocked users
    */
   static async getBlockedUsers(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
-      
+      const userId = req.user?.id;
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -341,9 +368,9 @@ export class ConnectionController {
         });
         return;
       }
-      
+
       const blocked = await ConnectionService.getBlockedUsers(userId);
-      
+
       res.status(200).json({
         success: true,
         data: blocked,
@@ -355,16 +382,16 @@ export class ConnectionController {
       });
     }
   }
-  
+
   /**
    * Search users for connections
    */
   static async searchUsers(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
+      const userId = req.user?.id;
       const query = req.query.q as string;
       const limit = parseInt(req.query.limit as string) || 20;
-      
+
       if (!userId) {
         res.status(401).json({
           success: false,
@@ -372,7 +399,7 @@ export class ConnectionController {
         });
         return;
       }
-      
+
       if (!query || typeof query !== 'string') {
         res.status(400).json({
           success: false,
@@ -380,9 +407,13 @@ export class ConnectionController {
         });
         return;
       }
-      
-      const users = await ConnectionService.searchUsers(query, userId, Math.min(limit, 50));
-      
+
+      const users = await ConnectionService.searchUsers(
+        query,
+        userId,
+        Math.min(limit, 50)
+      );
+
       res.status(200).json({
         success: true,
         data: users,

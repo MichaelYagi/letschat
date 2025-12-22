@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { conversationsApi } from '@/services/api';
-import { useAuth } from '@/contexts/AuthContext';
-import { X, Users, UserPlus } from 'lucide-react';
+import { conversationsApi } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { X, Users, UserPlus, Search } from 'lucide-react';
+// UserSearch component not implemented yet
 
 interface NewConversationModalProps {
   isOpen: boolean;
@@ -14,7 +15,7 @@ export function NewConversationModal({
   onClose,
   onConversationCreated,
 }: NewConversationModalProps) {
-  const { user } = useAuth();
+  const {} = useAuth();
   const [type, setType] = useState<'direct' | 'group'>('direct');
   const [username, setUsername] = useState('');
   const [groupName, setGroupName] = useState('');
@@ -22,6 +23,7 @@ export function NewConversationModal({
   const [participants, setParticipants] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showUserSearch, setShowUserSearch] = useState(false); // Disabled for now
 
   if (!isOpen) return null;
 
@@ -67,6 +69,11 @@ export function NewConversationModal({
     setDescription('');
     setParticipants('');
     setError('');
+  };
+
+  const handleUserSelect = (selectedUsername: string) => {
+    setUsername(selectedUsername);
+    setShowUserSearch(false);
   };
 
   return (
@@ -128,15 +135,32 @@ export function NewConversationModal({
               >
                 Username
               </label>
-              <input
-                type='text'
-                id='username'
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500'
-                placeholder='Enter username to message'
-                required
-              />
+              <div className='relative'>
+                <input
+                  type='text'
+                  id='username'
+                  value={username}
+                  onChange={e => {
+                    setUsername(e.target.value);
+                    if (e.target.value.length >= 2) {
+                      // setShowUserSearch(true); // Disabled
+                    } else {
+                      // setShowUserSearch(false); // Disabled
+                    }
+                  }}
+                  className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500'
+                  placeholder='Search for username or enter directly'
+                  required
+                />
+                <button
+                  type='button'
+                  onClick={() => setShowUserSearch(true)}
+                  className='absolute right-2 top-2 p-1 text-gray-400 hover:text-gray-600'
+                  title='Search users'
+                >
+                  <Search size={16} />
+                </button>
+              </div>
             </div>
           )}
 
@@ -220,6 +244,21 @@ export function NewConversationModal({
           </div>
         </form>
       </div>
+
+      {/* User Search Modal - Disabled for now */}
+      {showUserSearch && (
+        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
+          <div className='bg-white rounded-lg p-6 w-96'>
+            <p className='text-gray-600'>User search feature coming soon!</p>
+            <button
+              onClick={() => setShowUserSearch(false)}
+              className='mt-4 bg-blue-500 text-white px-4 py-2 rounded'
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

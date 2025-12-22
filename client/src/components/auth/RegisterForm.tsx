@@ -1,288 +1,182 @@
-import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Eye, EyeOff, Loader2, Check, X } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { RegisterData } from '@/types/auth';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
+import { X, UserPlus, Mail, Lock, User } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { Link } from 'react-router-dom';
 
-const registerSchema = z.object({
-  username: z
-    .string()
-    .min(3, 'Username must be at least 3 characters')
-    .max(20, 'Username must be 20 characters or less')
-    .regex(
-      /^[a-zA-Z0-9_]+$/,
-      'Username can only contain letters, numbers, and underscores'
-    ),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .max(128, 'Password must be 128 characters or less')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/\d/, 'Password must contain at least one number')
-    .regex(
-      /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/,
-      'Password must contain at least one special character'
-    ),
-  confirmPassword: z.string().min(1, 'Please confirm your password'),
-  displayName: z
-    .string()
-    .max(50, 'Display name must be 50 characters or less')
-    .optional(),
-});
+interface RegisterFormProps {
+  onSuccess?: () => void;
+}
 
-const passwordStrengthRequirements = [
-  { regex: /.{8,}/, text: 'At least 8 characters' },
-  { regex: /[A-Z]/, text: 'One uppercase letter' },
-  { regex: /[a-z]/, text: 'One lowercase letter' },
-  { regex: /\d/, text: 'One number' },
-  {
-    regex: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/,
-    text: 'One special character',
-  },
-];
+export function RegisterForm({ onSuccess }: RegisterFormProps) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const { register } = useAuth();
 
-type RegisterFormData = z.infer<typeof registerSchema>;
+  // WebSocket connection for real-time error monitoring
+  React.useEffect(() => {
+    const socket = io('http://localhost:3000');
 
-export function RegisterForm() {
-  const { register: registerUser, isLoading } = useAuth();
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [serverError, setServerError] = useState('');
+    socket.connect();
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors },
-  } = useForm<RegisterFormData>({
-    resolver: zodResolver(registerSchema),
-  });
+    socket.on('connect', () => {
+      console.log('🔌 Connected to error monitoring server');
+    });
 
-  const password = watch('password');
-  const confirmPassword = watch('confirmPassword');
+    socket.on('connect_error', error => {
+      console.error('🔌 WebSocket connection error:', error);
+      setError('Connection error: ' + error);
+    });
 
-  const getPasswordStrength = () => {
-    if (!password) return 0;
-    const passed = passwordStrengthRequirements.filter(req =>
-      req.regex.test(password)
-    );
-    return (passed.length / passwordStrengthRequirements.length) * 100;
-  };
+    socket.on('disconnect', () => {
+      console.log('🔌 Disconnected from error monitoring server');
+    });
 
-  const getPasswordStrengthColor = () => {
-    const strength = getPasswordStrength();
-    if (strength < 40) return 'bg-red-500';
-    if (strength < 80) return 'bg-yellow-500';
-    return 'bg-green-500';
-  };
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
-  const onSubmit = async (data: RegisterFormData) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    if (!username || !password) {
+      setError('Username and password are required');
+      setLoading(false);
+      return;
+    }
+
     try {
-      setServerError('');
-      const { confirmPassword, ...registerData } = data;
-      await registerUser(registerData);
-    } catch (error: any) {
-      setServerError(
-        error.response?.data?.error || 'Registration failed. Please try again.'
-      );
+      // Use AuthContext register for proper state management
+      await register({
+        username,
+        password,
+        displayName: displayName || username, // Fallback to username if display name is empty
+      });
+
+      onSuccess?.();
+    } catch (err: any) {
+      setError(err.message || 'Registration failed');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className='w-full max-w-md mx-auto'>
-      <div className='text-center mb-8'>
-        <h1 className='text-3xl font-bold text-gray-900 mb-2'>
-          Create Account
-        </h1>
-        <p className='text-gray-600'>Join Let's Chat today</p>
-      </div>
-
-      <form onSubmit={handleSubmit(onSubmit)} className='space-y-6'>
+    <div className='min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8'>
+      <div className='max-w-md w-full space-y-8'>
         <div>
-          <label
-            htmlFor='username'
-            className='block text-sm font-medium text-gray-700 mb-1'
-          >
-            Username
-          </label>
-          <input
-            id='username'
-            type='text'
-            {...register('username')}
-            className='input-field'
-            placeholder='Choose a username'
-            disabled={isLoading}
-          />
-          {errors.username && (
-            <p className='mt-1 text-sm text-red-600'>
-              {errors.username.message}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label
-            htmlFor='displayName'
-            className='block text-sm font-medium text-gray-700 mb-1'
-          >
-            Display Name (Optional)
-          </label>
-          <input
-            id='displayName'
-            type='text'
-            {...register('displayName')}
-            className='input-field'
-            placeholder='Your display name'
-            disabled={isLoading}
-          />
-          {errors.displayName && (
-            <p className='mt-1 text-sm text-red-600'>
-              {errors.displayName.message}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label
-            htmlFor='password'
-            className='block text-sm font-medium text-gray-700 mb-1'
-          >
-            Password
-          </label>
-          <div className='relative'>
-            <input
-              id='password'
-              type={showPassword ? 'text' : 'password'}
-              {...register('password')}
-              className='input-field pr-10'
-              placeholder='Create a password'
-              disabled={isLoading}
-            />
-            <button
-              type='button'
-              onClick={() => setShowPassword(!showPassword)}
-              className='absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none'
-              disabled={isLoading}
-            >
-              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-            </button>
+          <div className='mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-blue-100'>
+            <UserPlus className='h-6 w-6 text-blue-600' />
           </div>
-
-          {/* Password strength indicator */}
-          {password && (
-            <div className='mt-2 space-y-2'>
-              <div className='flex items-center justify-between'>
-                <span className='text-xs text-gray-600'>Password strength</span>
-                <span className='text-xs text-gray-600'>
-                  {Math.round(getPasswordStrength())}%
-                </span>
-              </div>
-              <div className='w-full bg-gray-200 rounded-full h-2'>
-                <div
-                  className={`h-2 rounded-full transition-all duration-300 ${getPasswordStrengthColor()}`}
-                  style={{ width: `${getPasswordStrength()}%` }}
-                />
-              </div>
-              <div className='space-y-1'>
-                {passwordStrengthRequirements.map((req, index) => (
-                  <div key={index} className='flex items-center text-xs'>
-                    {req.regex.test(password) ? (
-                      <Check size={12} className='text-green-500 mr-1' />
-                    ) : (
-                      <X size={12} className='text-red-500 mr-1' />
-                    )}
-                    <span
-                      className={
-                        req.regex.test(password)
-                          ? 'text-green-600'
-                          : 'text-gray-600'
-                      }
-                    >
-                      {req.text}
-                    </span>
-                  </div>
-                ))}
-              </div>
+          <h2 className='mt-6 text-center text-3xl font-extrabold text-gray-900'>
+            Create your account
+          </h2>
+        </div>
+        <form className='mt-8 space-y-6' onSubmit={handleSubmit}>
+          {error && (
+            <div className='bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded'>
+              {error}
             </div>
           )}
+          <div className='space-y-4'>
+            <div>
+              <label
+                htmlFor='username'
+                className='block text-sm font-medium text-gray-700'
+              >
+                Username
+              </label>
+              <div className='mt-1 relative'>
+                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                  <User className='h-5 w-5 text-gray-400' />
+                </div>
+                <input
+                  id='username'
+                  name='username'
+                  type='text'
+                  required
+                  className='appearance-none rounded-md relative block w-full pl-10 pr-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm'
+                  placeholder='Enter username'
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <label
+                htmlFor='displayName'
+                className='block text-sm font-medium text-gray-700'
+              >
+                Display Name (optional)
+              </label>
+              <div className='mt-1 relative'>
+                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                  <User className='h-5 w-5 text-gray-400' />
+                </div>
+                <input
+                  id='displayName'
+                  name='displayName'
+                  type='text'
+                  className='appearance-none rounded-md relative block w-full pl-10 pr-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm'
+                  placeholder='Enter display name (optional)'
+                  value={displayName}
+                  onChange={e => setDisplayName(e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <label
+                htmlFor='password'
+                className='block text-sm font-medium text-gray-700'
+              >
+                Password
+              </label>
+              <div className='mt-1 relative'>
+                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
+                  <Lock className='h-5 w-5 text-gray-400' />
+                </div>
+                <input
+                  id='password'
+                  name='password'
+                  type='password'
+                  required
+                  className='appearance-none rounded-md relative block w-full pl-10 pr-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm'
+                  placeholder='Enter password'
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
 
-          {errors.password && (
-            <p className='mt-1 text-sm text-red-600'>
-              {errors.password.message}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label
-            htmlFor='confirmPassword'
-            className='block text-sm font-medium text-gray-700 mb-1'
-          >
-            Confirm Password
-          </label>
-          <div className='relative'>
-            <input
-              id='confirmPassword'
-              type={showConfirmPassword ? 'text' : 'password'}
-              {...register('confirmPassword')}
-              className='input-field pr-10'
-              placeholder='Confirm your password'
-              disabled={isLoading}
-            />
+          <div>
             <button
-              type='button'
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className='absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none'
-              disabled={isLoading}
+              type='submit'
+              disabled={loading}
+              className='group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50'
             >
-              {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              {loading ? 'Creating account...' : 'Create account'}
             </button>
           </div>
-          {confirmPassword && password !== confirmPassword && (
-            <p className='mt-1 text-sm text-red-600'>Passwords do not match</p>
-          )}
-          {errors.confirmPassword && (
-            <p className='mt-1 text-sm text-red-600'>
-              {errors.confirmPassword.message}
-            </p>
-          )}
-        </div>
 
-        {serverError && (
-          <div className='bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm'>
-            {serverError}
+          <div className='text-center'>
+            <span className='text-sm text-gray-600'>
+              Already have an account?{' '}
+              <Link
+                to='/login'
+                className='font-medium text-blue-600 hover:text-blue-500'
+              >
+                Sign in
+              </Link>
+            </span>
           </div>
-        )}
-
-        <button
-          type='submit'
-          disabled={isLoading || password !== confirmPassword}
-          className='btn btn-primary w-full flex items-center justify-center'
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className='animate-spin mr-2' size={20} />
-              Creating account...
-            </>
-          ) : (
-            'Create Account'
-          )}
-        </button>
-      </form>
-
-      <div className='mt-6 text-center'>
-        <p className='text-sm text-gray-600'>
-          Already have an account?{' '}
-          <a
-            href='/login'
-            className='font-medium text-primary-600 hover:text-primary-500'
-          >
-            Sign in
-          </a>
-        </p>
+        </form>
       </div>
     </div>
   );

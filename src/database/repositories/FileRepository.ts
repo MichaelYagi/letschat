@@ -1,7 +1,7 @@
 import db from '../connection';
+import fs from 'fs';
 import { FileMetadata } from '../../middleware/fileUpload';
 import { EncryptionService } from '../../utils/encryption';
-import * as fs from 'fs';
 
 export class FileRepository {
   /**
@@ -16,7 +16,7 @@ export class FileRepository {
     thumbnailPath?: string;
   }): Promise<any> {
     const fileId = EncryptionService.generateUUID();
-    
+
     const [file] = await db('message_attachments')
       .insert({
         id: fileId,
@@ -29,21 +29,19 @@ export class FileRepository {
         created_at: new Date(),
       })
       .returning('*');
-    
+
     return file;
   }
-  
+
   /**
    * Get file metadata by ID
    */
   static async findById(id: string): Promise<any | null> {
-    const file = await db('message_attachments')
-      .where('id', id)
-      .first();
-    
+    const file = await db('message_attachments').where('id', id).first();
+
     return file;
   }
-  
+
   /**
    * Get files for message
    */
@@ -51,23 +49,23 @@ export class FileRepository {
     const files = await db('message_attachments')
       .where('message_id', messageId)
       .orderBy('created_at', 'asc');
-    
+
     return files;
   }
-  
+
   /**
    * Delete file metadata and physical file
    */
   static async delete(id: string): Promise<boolean> {
     const file = await this.findById(id);
-    
+
     if (file) {
       // Delete physical file
       try {
         if (fs.existsSync(file.file_path)) {
           fs.unlinkSync(file.file_path);
         }
-        
+
         // Delete thumbnail if exists
         if (file.thumbnail_path && fs.existsSync(file.thumbnail_path)) {
           fs.unlinkSync(file.thumbnail_path);
@@ -75,18 +73,18 @@ export class FileRepository {
       } catch (error) {
         console.error('Error deleting physical files:', error);
       }
-      
+
       // Delete database record
       const deletedCount = await db('message_attachments')
         .where('id', id)
         .del();
-      
+
       return deletedCount > 0;
     }
-    
+
     return false;
   }
-  
+
   /**
    * Cleanup orphaned files
    */

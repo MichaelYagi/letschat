@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Frontend Auth UI Test</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        margin: 20px;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+      }
+      input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      button {
+        background: #3b82f6;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 10px;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .error {
+        color: #dc2626;
+        background: #fee2e2;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+      }
+      .success {
+        color: #059669;
+        background: #d1fae5;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+      }
+      .hidden {
+        display: none;
+      }
+      .visible {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState } = React;
+
+      function App() {
+        const [isRegistering, setIsRegistering] = useState(false);
+        const [isLoggingIn, setIsLoggingIn] = useState(false);
+        const [formData, setFormData] = useState({
+          username: '',
+          password: '',
+          displayName: '',
+        });
+        const [message, setMessage] = useState('');
+        const [messageType, setMessageType] = useState('');
+
+        const handleInputChange = e => {
+          const { name, value } = e.target;
+          setFormData(prev => ({ ...prev, [name]: value }));
+        };
+
+        const handleRegister = async e => {
+          e.preventDefault();
+          setIsRegistering(true);
+          setMessage('');
+
+          try {
+            const response = await fetch(
+              'http://localhost:3001/api/auth/register',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  username: formData.username,
+                  password: formData.password,
+                  displayName: formData.displayName,
+                }),
+              }
+            );
+
+            const data = await response.json();
+
+            if (response.ok) {
+              setMessageType('success');
+              setMessage(
+                `✅ Registration successful! User ${data.data.user.displayName || data.data.user.username} created.`
+              );
+
+              // Store token in localStorage (simulate browser behavior)
+              localStorage.setItem(
+                'letschat_token',
+                data.data.tokens.accessToken
+              );
+              localStorage.setItem(
+                'letschat_user',
+                JSON.stringify(data.data.user)
+              );
+
+              // Test immediate login
+              setTimeout(() => testLogin(), 1000);
+            } else {
+              setMessageType('error');
+              setMessage(
+                `❌ Registration failed: ${data.error || 'Unknown error'}`
+              );
+            }
+          } catch (error) {
+            setMessageType('error');
+            setMessage(`❌ Network error: ${error.message}`);
+          } finally {
+            setIsRegistering(false);
+          }
+        };
+
+        const handleLogin = async e => {
+          e.preventDefault();
+          setIsLoggingIn(true);
+          setMessage('');
+
+          try {
+            const response = await fetch(
+              'http://localhost:3001/api/auth/login',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  username: formData.username,
+                  password: formData.password,
+                }),
+              }
+            );
+
+            const data = await response.json();
+
+            if (response.ok) {
+              setMessageType('success');
+              setMessage(
+                `✅ Login successful! Welcome back, ${data.data.user.displayName || data.data.user.username}.`
+              );
+
+              // Store token
+              localStorage.setItem(
+                'letschat_token',
+                data.data.tokens.accessToken
+              );
+              localStorage.setItem(
+                'letschat_user',
+                JSON.stringify(data.data.user)
+              );
+
+              // Test database persistence
+              setTimeout(() => verifyInDatabase(), 1000);
+            } else {
+              setMessageType('error');
+              setMessage(`❌ Login failed: ${data.error || 'Unknown error'}`);
+            }
+          } catch (error) {
+            setMessageType('error');
+            setMessage(`❌ Network error: ${error.message}`);
+          } finally {
+            setIsLoggingIn(false);
+          }
+        };
+
+        const testLogin = async () => {
+          try {
+            const response = await fetch(
+              'http://localhost:3001/api/auth/login',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  username: formData.username,
+                  password: formData.password,
+                }),
+              }
+            );
+
+            const data = await response.json();
+            if (response.ok) {
+              setMessage(prev => prev + ' ✅ Immediate login also successful!');
+            } else {
+              setMessage(prev => prev + ' ❌ Immediate login failed.');
+            }
+          } catch (error) {
+            setMessage(prev => prev + ` ❌ Network error: ${error.message}`);
+          }
+        };
+
+        const verifyInDatabase = async () => {
+          try {
+            // This would be server-side verification, but we'll simulate
+            setMessage(
+              prev =>
+                prev +
+                ' 🗃 Database verification: Check server console for real database state.'
+            );
+          } catch (error) {
+            setMessage(
+              prev => prev + ` ❌ Database verification error: ${error.message}`
+            );
+          }
+        };
+
+        return React.createElement(
+          'div',
+          null,
+          React.createElement('h1', null, 'Frontend Auth UI Test'),
+          React.createElement(
+            'div',
+            { style: { maxWidth: '500px', margin: '0 auto' } },
+            [
+              React.createElement(
+                'div',
+                {
+                  className: `alert ${messageType} ${message ? 'visible' : 'hidden'}`,
+                },
+                message
+              ),
+
+              React.createElement('h2', null, 'Register New User'),
+              React.createElement('form', { onSubmit: handleRegister }, [
+                React.createElement('h3', null, 'Registration Form'),
+                React.createElement('div', { className: 'form-group' }, [
+                  React.createElement('label', null, 'Username:'),
+                  React.createElement('input', {
+                    type: 'text',
+                    name: 'username',
+                    value: formData.username,
+                    onChange: handleInputChange,
+                    required: true,
+                    placeholder: 'Enter username',
+                  }),
+                ]),
+                React.createElement('div', { className: 'form-group' }, [
+                  React.createElement('label', null, 'Password:'),
+                  React.createElement('input', {
+                    type: 'password',
+                    name: 'password',
+                    value: formData.password,
+                    onChange: handleInputChange,
+                    required: true,
+                    placeholder: 'Enter password',
+                  }),
+                ]),
+                React.createElement('div', { className: 'form-group' }, [
+                  React.createElement(
+                    'label',
+                    null,
+                    'Display Name (optional):'
+                  ),
+                  React.createElement('input', {
+                    type: 'text',
+                    name: 'displayName',
+                    value: formData.displayName,
+                    onChange: handleInputChange,
+                    placeholder: 'Enter display name',
+                  }),
+                ]),
+                React.createElement(
+                  'button',
+                  {
+                    type: 'submit',
+                    disabled: isRegistering,
+                  },
+                  isRegistering ? 'Creating Account...' : 'Register'
+                ),
+              ]),
+
+              React.createElement('hr', { style: { margin: '30px 0' } }),
+
+              React.createElement('h2', null, 'Login User'),
+              React.createElement('form', { onSubmit: handleLogin }, [
+                React.createElement('div', { className: 'form-group' }, [
+                  React.createElement('label', null, 'Username:'),
+                  React.createElement('input', {
+                    type: 'text',
+                    name: 'username',
+                    value: formData.username,
+                    onChange: handleInputChange,
+                    required: true,
+                    placeholder: 'Enter username',
+                  }),
+                ]),
+                React.createElement('div', { className: 'form-group' }, [
+                  React.createElement('label', null, 'Password:'),
+                  React.createElement('input', {
+                    type: 'password',
+                    name: 'password',
+                    value: formData.password,
+                    onChange: handleInputChange,
+                    required: true,
+                    placeholder: 'Enter password',
+                  }),
+                ]),
+                React.createElement(
+                  'button',
+                  {
+                    type: 'submit',
+                    disabled: isLoggingIn,
+                  },
+                  isLoggingIn ? 'Logging In...' : 'Login'
+                ),
+              ]),
+            ]
+          )
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(
+        React.createElement(App)
+      );
+    </script>
+  </body>
+</html>

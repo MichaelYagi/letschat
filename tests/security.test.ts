@@ -1,179 +1,124 @@
 import { EncryptionService, MessageEncryption } from '../src/utils/encryption';
 import { SecurityService } from '../src/utils/security';
 
-async function testEncryption() {
-  console.log('🔐 Testing Encryption Service...');
+describe('Security Tests', () => {
+  describe('Encryption Service', () => {
+    test('Symmetric encryption works', () => {
+      const message = 'Hello, this is a secret message!';
+      const { encrypted, tag, iv } = EncryptionService.encrypt(message);
+      const decrypted = EncryptionService.decrypt(encrypted, tag, iv);
 
-  try {
-    // Test symmetric encryption
-    const message = 'Hello, this is a secret message!';
-    const { encrypted, tag } = EncryptionService.encrypt(message);
-    const decrypted = EncryptionService.decrypt(encrypted, tag);
+      expect(encrypted).toBeDefined();
+      expect(tag).toBeDefined();
+      expect(iv).toBeDefined();
+      expect(decrypted).toBe(message);
+    });
 
-    console.log('✅ Symmetric encryption works');
-    console.log(`   Original: ${message}`);
-    console.log(`   Decrypted: ${decrypted}`);
-    console.log(`   Match: ${message === decrypted}`);
+    test('Asymmetric encryption works', () => {
+      const message = 'Hello, this is a secret message!';
+      const { publicKey, privateKey } = EncryptionService.generateKeyPair();
+      const asymEncrypted = EncryptionService.encryptWithPublicKey(
+        message,
+        publicKey
+      );
+      const asymDecrypted = EncryptionService.decryptWithPrivateKey(
+        asymEncrypted,
+        privateKey
+      );
 
-    // Test asymmetric encryption
-    const { publicKey, privateKey } = EncryptionService.generateKeyPair();
-    const asymEncrypted = EncryptionService.encryptWithPublicKey(
-      message,
-      publicKey
-    );
-    const asymDecrypted = EncryptionService.decryptWithPrivateKey(
-      asymEncrypted,
-      privateKey
-    );
+      expect(asymEncrypted).toBeDefined();
+      expect(asymDecrypted).toBe(message);
+    });
 
-    console.log('✅ Asymmetric encryption works');
-    console.log(`   Original: ${message}`);
-    console.log(`   Decrypted: ${asymDecrypted}`);
-    console.log(`   Match: ${message === asymDecrypted}`);
+    test('End-to-end encryption works', () => {
+      const message = 'Hello, this is a secret message!';
+      const senderKeys = EncryptionService.generateKeyPair();
+      const recipientKeys = EncryptionService.generateKeyPair();
 
-    // Test end-to-end encryption
-    const senderKeys = EncryptionService.generateKeyPair();
-    const recipientKeys = EncryptionService.generateKeyPair();
+      const e2eEncrypted = MessageEncryption.encryptMessage(
+        message,
+        recipientKeys.publicKey,
+        senderKeys.privateKey
+      );
 
-    const e2eEncrypted = MessageEncryption.encryptMessage(
-      message,
-      recipientKeys.publicKey,
-      senderKeys.privateKey
-    );
+      const e2eDecrypted = MessageEncryption.decryptMessage(
+        e2eEncrypted.encryptedContent,
+        e2eEncrypted.signature,
+        recipientKeys.privateKey,
+        senderKeys.publicKey
+      );
 
-    const e2eDecrypted = MessageEncryption.decryptMessage(
-      e2eEncrypted.encryptedContent,
-      e2eEncrypted.signature,
-      recipientKeys.privateKey,
-      senderKeys.publicKey
-    );
+      expect(e2eEncrypted.encryptedContent).toBeDefined();
+      expect(e2eEncrypted.signature).toBeDefined();
+      expect(e2eDecrypted).toBe(message);
+    });
+  });
 
-    console.log('✅ End-to-end encryption works');
-    console.log(`   Original: ${message}`);
-    console.log(`   Decrypted: ${e2eDecrypted}`);
-    console.log(`   Match: ${message === e2eDecrypted}`);
+  describe('Security Service', () => {
+    test('Password hashing and verification works', async () => {
+      const password = 'SecurePassword123!';
+      const hash = await SecurityService.hashPassword(password);
+      const isValid = await SecurityService.verifyPassword(password, hash);
+      const isInvalid = await SecurityService.verifyPassword(
+        'wrongpassword',
+        hash
+      );
 
-    return true;
-  } catch (error) {
-    console.error('❌ Encryption test failed:', error);
-    return false;
-  }
-}
+      expect(hash).toBeDefined();
+      expect(hash.length).toBeGreaterThan(0);
+      expect(isValid).toBe(true);
+      expect(isInvalid).toBe(false);
+    });
 
-async function testSecurity() {
-  console.log('\n🛡️  Testing Security Service...');
+    test('Input validation works', () => {
+      const validUsername = SecurityService.isValidUsername('user123');
+      const invalidUsername = SecurityService.isValidUsername('us');
 
-  try {
-    // Test password hashing
-    const password = 'SecurePassword123!';
-    const hash = await SecurityService.hashPassword(password);
-    const isValid = await SecurityService.verifyPassword(password, hash);
-    const isInvalid = await SecurityService.verifyPassword(
-      'wrongpassword',
-      hash
-    );
+      expect(validUsername).toBe(true);
+      expect(invalidUsername).toBe(false);
+    });
 
-    console.log('✅ Password hashing works');
-    console.log(`   Hash length: ${hash.length}`);
-    console.log(`   Valid password: ${isValid}`);
-    console.log(`   Invalid password: ${isInvalid}`);
+    test('Password strength validation works', () => {
+      const strongPass = SecurityService.validatePassword('StrongPass123!');
+      const weakPass = SecurityService.validatePassword('weak');
 
-    // Test input validation
-    const validUsername = SecurityService.isValidUsername('user123');
-    const invalidUsername = SecurityService.isValidUsername('us');
+      expect(strongPass.isValid).toBe(true);
+      expect(weakPass.isValid).toBe(false);
+      expect(weakPass.errors.length).toBeGreaterThan(0);
+    });
 
-    console.log('✅ Input validation works');
-    console.log(`   Valid username: ${validUsername}`);
-    console.log(`   Invalid username: ${invalidUsername}`);
+    test('XSS sanitization works', () => {
+      const malicious = '<script>alert("xss")</script>';
+      const sanitized = SecurityService.sanitizeInput(malicious);
 
-    // Test password strength validation
-    const strongPass = SecurityService.validatePassword('StrongPass123!');
-    const weakPass = SecurityService.validatePassword('weak');
+      expect(sanitized).not.toBe(malicious);
+      expect(sanitized).not.toContain('<script>');
+    });
+  });
 
-    console.log('✅ Password validation works');
-    console.log(`   Strong password: ${strongPass.isValid}`);
-    console.log(`   Weak password: ${weakPass.isValid}`);
-    if (!weakPass.isValid) {
-      console.log(`   Errors: ${weakPass.errors.join(', ')}`);
-    }
+  describe('JWT Service', () => {
+    test('JWT token generation and verification works', () => {
+      const { generateToken, verifyToken } = require('../src/config/jwt');
 
-    // Test XSS sanitization
-    const malicious = '<script>alert("xss")</script>';
-    const sanitized = SecurityService.sanitizeInput(malicious);
+      const payload = {
+        userId: 'user-123',
+        username: 'testuser',
+      };
 
-    console.log('✅ XSS sanitization works');
-    console.log(`   Original: ${malicious}`);
-    console.log(`   Sanitized: ${sanitized}`);
-    console.log(`   Sanitized: ${!sanitized.includes('<script>')}`);
+      const token = generateToken(payload);
+      const decoded = verifyToken(token);
 
-    return true;
-  } catch (error) {
-    console.error('❌ Security test failed:', error);
-    return false;
-  }
-}
+      expect(token).toBeDefined();
+      expect(decoded.userId).toBe(payload.userId);
+      expect(decoded.username).toBe(payload.username);
+    });
 
-async function testJWT() {
-  console.log('\n🎫 Testing JWT Service...');
+    test('JWT properly rejects invalid tokens', () => {
+      const { verifyToken } = require('../src/config/jwt');
 
-  try {
-    const { generateToken, verifyToken } = require('../src/config/jwt');
-
-    const payload = {
-      userId: 'user-123',
-      username: 'testuser',
-    };
-
-    const token = generateToken(payload);
-    const decoded = verifyToken(token);
-
-    console.log('✅ JWT token generation and verification works');
-    console.log(`   Original user ID: ${payload.userId}`);
-    console.log(`   Decoded user ID: ${decoded.userId}`);
-    console.log(`   Original username: ${payload.username}`);
-    console.log(`   Decoded username: ${decoded.username}`);
-    console.log(
-      `   Token matches: ${payload.userId === decoded.userId && payload.username === decoded.username}`
-    );
-
-    // Test malformed token
-    try {
-      verifyToken('invalid-token');
-      console.log('❌ Should have thrown error for invalid token');
-      return false;
-    } catch {
-      console.log('✅ JWT properly rejects invalid tokens');
-    }
-
-    return true;
-  } catch (error) {
-    console.error('❌ JWT test failed:', error);
-    return false;
-  }
-}
-
-async function runAllTests() {
-  console.log('🧪 Running security tests...\n');
-
-  const results = await Promise.all([
-    testEncryption(),
-    testSecurity(),
-    testJWT(),
-  ]);
-
-  const allPassed = results.every(result => result === true);
-
-  console.log('\n' + '='.repeat(50));
-  if (allPassed) {
-    console.log('🎉 All security tests passed! ✨');
-    process.exit(0);
-  } else {
-    console.log('💥 Some security tests failed! ❌');
-    process.exit(1);
-  }
-}
-
-runAllTests().catch(error => {
-  console.error('💥 Test runner failed:', error);
-  process.exit(1);
+      expect(() => {
+        verifyToken('invalid-token');
+      }).toThrow();
+    });
+  });
 });

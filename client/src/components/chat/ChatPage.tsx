@@ -1,13 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
-import { useWebSocket } from '@/hooks/useWebSocket';
-import { useAuth } from '@/contexts/AuthContext';
+import { TypingIndicator } from './TypingIndicator';
+import { useWebSocket } from '../../hooks/useWebSocket';
+import { useNotifications } from '../../hooks/useNotifications';
+import { useSoundNotifications } from '../../hooks/useSoundNotifications';
+import { useAuth } from '../../contexts/AuthContext';
 import { Phone, Video, Info } from 'lucide-react';
+import api from '../../services/api';
 
 interface ChatPageProps {
-  conversationId: string;
+  conversationId?: string;
   conversationName?: string;
+  onClose?: () => void;
 }
 
 export function ChatPage({ conversationId, conversationName }: ChatPageProps) {
@@ -20,6 +25,16 @@ export function ChatPage({ conversationId, conversationName }: ChatPageProps) {
     sendTyping,
     typingUsers,
   } = useWebSocket();
+
+  const { showMessageNotification } = useNotifications();
+  const { playNotificationSound } = useSoundNotifications();
+
+  // Convert typingUsers Set to array of user objects
+  const typingUsersArray = Array.from(typingUsers).map(userId => ({
+    id: userId,
+    username: `User${userId.slice(0, 4)}`, // In real app, get from user list
+    displayName: `User${userId.slice(0, 4)}`,
+  }));
   const [isLoading, setIsLoading] = useState(true);
   const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(
     null
@@ -29,11 +44,33 @@ export function ChatPage({ conversationId, conversationName }: ChatPageProps) {
     if (connected && conversationId) {
       joinConversation(conversationId);
       setIsLoading(false);
+      markConversationAsRead();
     }
   }, [connected, conversationId, joinConversation]);
 
+  // Show notification for new messages
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (
+      lastMessage &&
+      lastMessage.senderId !== user?.id &&
+      !document.hasFocus()
+    ) {
+      showMessageNotification(lastMessage, conversationName);
+      playNotificationSound();
+    }
+  }, [
+    messages,
+    user?.id,
+    showMessageNotification,
+    conversationName,
+    playNotificationSound,
+  ]);
+
   const handleSendMessage = (content: string) => {
-    sendMessage(conversationId, content);
+    if (conversationId) {
+      sendMessage(conversationId, content);
+    }
   };
 
   const handleTyping = (isTyping: boolean) => {
@@ -41,27 +78,57 @@ export function ChatPage({ conversationId, conversationName }: ChatPageProps) {
       clearTimeout(typingTimeout);
     }
 
-    if (isTyping) {
+    if (isTyping && conversationId) {
       const timeout = setTimeout(() => {
         sendTyping(conversationId, false);
       }, 1000);
       setTypingTimeout(timeout);
       sendTyping(conversationId, true);
-    } else {
+    } else if (conversationId) {
       sendTyping(conversationId, false);
     }
   };
 
-  const getTypingIndicator = () => {
-    if (typingUsers.size === 0) return '';
+  const handleAddReaction = async (messageId: string, emoji: string) => {
+    try {
+      await api.post('/messages/reactions', {
+        messageId,
+        emoji,
+        conversationId,
+      });
+    } catch (error) {
+      console.error('Error adding reaction:', error);
+    }
+  };
 
-    const users = Array.from(typingUsers);
-    if (users.length === 1) {
-      return 'Someone is typing...';
-    } else if (users.length === 2) {
-      return 'Two people are typing...';
-    } else {
-      return 'Several people are typing...';
+  const handleRemoveReaction = async (messageId: string, emoji: string) => {
+    try {
+      await api.delete('/messages/reactions', {
+        data: { messageId, emoji, conversationId },
+      });
+    } catch (error) {
+      console.error('Error removing reaction:', error);
+    }
+  };
+
+  const markAsRead = async (messageId: string) => {
+    try {
+      await api.post('/messages/read-receipts', {
+        messageId,
+        conversationId,
+      });
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+    }
+  };
+
+  const markConversationAsRead = async () => {
+    try {
+      await api.post('/messages/mark-read', {
+        conversationId,
+      });
+    } catch (error) {
+      console.error('Error marking conversation as read:', error);
     }
   };
 
@@ -77,7 +144,9 @@ export function ChatPage({ conversationId, conversationName }: ChatPageProps) {
             <div>
               <h2 className='text-lg font-semibold text-gray-900'>
                 {conversationName ||
-                  `Conversation ${conversationId.slice(0, 8)}`}
+                  (conversationId &&
+                    `Conversation ${conversationId.slice(0, 8)}`) ||
+                  'Chat'}
               </h2>
               <p className='text-sm text-gray-500'>
                 {connected ? 'Connected' : 'Connecting...'}
@@ -101,24 +170,27 @@ export function ChatPage({ conversationId, conversationName }: ChatPageProps) {
 
       {/* Messages Area */}
       <MessageList
-        messages={messages.filter(m => m.conversationId === conversationId)}
+        messages={messages.filter(
+          m => conversationId && m.conversationId === conversationId
+        )}
         currentUser={user!}
         loading={isLoading}
+        onAddReaction={handleAddReaction}
+        onRemoveReaction={handleRemoveReaction}
+        onReadReceipt={markAsRead}
       />
 
-      {/* Typing Indicator */}
-      {typingUsers.size > 0 && (
-        <div className='px-4 py-2 bg-gray-50 text-sm text-gray-500 italic'>
-          {getTypingIndicator()}
-        </div>
-      )}
+      {/* Enhanced Typing Indicator */}
+      {conversationId && <TypingIndicator users={typingUsersArray} />}
 
       {/* Message Input */}
-      <MessageInput
-        onSendMessage={handleSendMessage}
-        onTyping={handleTyping}
-        disabled={!connected}
-      />
+      {conversationId && (
+        <MessageInput
+          onSendMessage={handleSendMessage}
+          onTyping={handleTyping}
+          disabled={!connected}
+        />
+      )}
     </div>
   );
 }

@@ -1,3 +1,17 @@
+export interface MessageReaction {
+  id: string;
+  messageId: string;
+  userId: string;
+  emoji: string;
+  createdAt: Date;
+}
+
+export interface MessageReactionSummary {
+  emoji: string;
+  count: number;
+  currentUserReacted: boolean;
+}
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -10,6 +24,7 @@ export interface Message {
   threadId?: string;
   editedAt?: Date;
   deletedAt?: Date;
+  reactions?: MessageReactionSummary[];
   createdAt: Date;
 }
 
@@ -72,7 +87,13 @@ export interface AddParticipantRequest {
 }
 
 export interface WebSocketMessage {
-  type: 'message' | 'typing' | 'user_status' | 'conversation_update' | 'error';
+  type:
+    | 'message'
+    | 'typing'
+    | 'user_status'
+    | 'conversation_update'
+    | 'message_reaction'
+    | 'error';
   data: any;
   timestamp: Date;
   from?: string;
@@ -102,4 +123,47 @@ export interface ConversationUpdateEvent {
 export interface MessageEvent {
   message: Message;
   attachments?: MessageAttachment[];
+}
+
+export interface MessageReactionEvent {
+  messageId: string;
+  emoji: string;
+  userId: string;
+  action: 'add' | 'remove';
+}
+
+export interface AddReactionRequest {
+  messageId: string;
+  emoji: string;
+}
+
+export interface RemoveReactionRequest {
+  messageId: string;
+  emoji: string;
+}
+
+export interface MessageReadReceipt {
+  id: string;
+  messageId: string;
+  userId: string;
+  readAt: Date;
+}
+
+export interface MessageDeliveryStatus {
+  id: string;
+  messageId: string;
+  userId: string;
+  status: 'sent' | 'delivered' | 'read' | 'failed';
+  timestamp: Date;
+}
+
+export interface AddReadReceiptRequest {
+  messageId: string;
+  conversationId: string;
+}
+
+export interface UpdateDeliveryStatusRequest {
+  messageId: string;
+  userId: string;
+  status: 'sent' | 'delivered' | 'read' | 'failed';
 }

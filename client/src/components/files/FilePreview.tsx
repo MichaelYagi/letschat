@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState } from 'react';
 import {
   Download,
   Trash2,
@@ -8,9 +8,11 @@ import {
   FileText,
   Eye,
 } from 'lucide-react';
-import { FilePreviewProps } from '@/types/files';
+import { FilePreviewProps } from '../types/files';
 
 export function FilePreview({ file, onDownload, onDelete }: FilePreviewProps) {
+  const [imageError, setImageError] = useState(false);
+
   const getFileIcon = () => {
     if (file.mimeType.startsWith('image/'))
       return <Image size={48} className='text-gray-400' />;
@@ -36,11 +38,12 @@ export function FilePreview({ file, onDownload, onDelete }: FilePreviewProps) {
     <div className='card p-4 hover:shadow-md transition-shadow'>
       {/* Preview/Thumbnail */}
       <div className='relative mb-4'>
-        {isImage && file.thumbnailPath ? (
+        {isImage && file.thumbnailPath && !imageError ? (
           <img
             src={file.thumbnailPath}
             alt={file.fileName}
             className='w-full h-48 object-cover rounded-lg'
+            onError={() => setImageError(true)}
           />
         ) : (
           <div className='w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center'>

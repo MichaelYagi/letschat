@@ -48,7 +48,7 @@ export class AuthService {
 
     // Generate JWT token
     const token = generateToken({
-      userId: user.id,
+      id: user.id,
       username: user.username,
     });
 
@@ -97,7 +97,7 @@ export class AuthService {
 
     // Generate JWT token
     const token = generateToken({
-      userId: user.id,
+      id: user.id,
       username: user.username,
     });
 
@@ -170,7 +170,7 @@ export class AuthService {
       }
 
       // Get user
-      const user = await UserRepository.getPublicProfile(decoded.userId);
+      const user = await UserRepository.getPublicProfile(decoded.id);
 
       if (!user) {
         return { valid: false, error: 'User not found' };

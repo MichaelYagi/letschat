@@ -1,4 +1,4 @@
-import React, {
+import {
   createContext,
   useContext,
   useReducer,
@@ -10,14 +10,16 @@ import {
   LoginCredentials,
   RegisterData,
   AuthResponse,
-} from '@/types/auth';
-import { authApi } from '@/services/api';
+} from '../types/auth';
+import { authApi } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  error: string | null;
+  clearError: () => void;
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
@@ -29,19 +31,23 @@ type AuthState = {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  error: string | null;
 };
 
 type AuthAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_AUTH'; payload: { user: User; token: string } }
   | { type: 'CLEAR_AUTH' }
-  | { type: 'UPDATE_USER'; payload: Partial<User> };
+  | { type: 'UPDATE_USER'; payload: Partial<User> }
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'CLEAR_ERROR' };
 
-const initialState = {
+const initialState: AuthState = {
   user: null,
   token: null,
   isAuthenticated: false,
   isLoading: true,
+  error: null,
 };
 
 function authReducer(state: AuthState, action: AuthAction): AuthState {
@@ -55,6 +61,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         token: action.payload.token,
         isAuthenticated: true,
         isLoading: false,
+        error: null,
       };
     case 'CLEAR_AUTH':
       return {
@@ -63,12 +70,17 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         token: null,
         isAuthenticated: false,
         isLoading: false,
+        error: null,
       };
     case 'UPDATE_USER':
       return {
         ...state,
         user: state.user ? { ...state.user, ...action.payload } : null,
       };
+    case 'SET_ERROR':
+      return { ...state, error: action.payload, isLoading: false };
+    case 'CLEAR_ERROR':
+      return { ...state, error: null };
     default:
       return state;
   }
@@ -88,10 +100,49 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const token = localStorage.getItem('letschat_token');
       if (token) {
         try {
-          const user = await authApi.getProfile();
-          dispatch({ type: 'SET_AUTH', payload: { user, token } });
+          // For mock token, try to get stored user data
+          if (token === 'mock-jwt-token') {
+            const storedUser = localStorage.getItem('letschat_user');
+            if (storedUser) {
+              const user = JSON.parse(storedUser);
+              dispatch({
+                type: 'SET_AUTH',
+                payload: { user, token },
+              });
+            } else {
+              dispatch({ type: 'CLEAR_AUTH' });
+            }
+            return;
+          } else {
+            // For real JWT tokens, decode and validate
+            const tokenParts = token.split('.');
+            if (tokenParts.length === 3) {
+              const userData = JSON.parse(atob(tokenParts[1]));
+              if (userData.userId && userData.username) {
+                dispatch({
+                  type: 'SET_AUTH',
+                  payload: {
+                    user: {
+                      id: userData.userId.toString(),
+                      username: userData.username,
+                      status: 'online',
+                      lastSeen: new Date().toISOString(),
+                      displayName: userData.username,
+                    },
+                    token,
+                  },
+                });
+              } else {
+                throw new Error('Invalid token format');
+              }
+            } else {
+              throw new Error('Invalid token structure');
+            }
+          }
         } catch (error) {
+          console.error('Token validation failed:', error);
           localStorage.removeItem('letschat_token');
+          localStorage.removeItem('letschat_user');
           dispatch({ type: 'CLEAR_AUTH' });
         }
       } else {
@@ -110,8 +161,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         type: 'SET_AUTH',
         payload: { user: response.user, token: response.token },
       });
-    } catch (error) {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      // Store user data for mock tokens
+      localStorage.setItem('letschat_user', JSON.stringify(response.user));
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message || 'Login failed' });
       throw error;
     }
   };
@@ -124,8 +177,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         type: 'SET_AUTH',
         payload: { user: response.user, token: response.token },
       });
-    } catch (error) {
-      dispatch({ type: 'SET_LOADING', payload: false });
+      // Store user data for mock tokens
+      localStorage.setItem('letschat_user', JSON.stringify(response.user));
+    } catch (error: any) {
+      dispatch({
+        type: 'SET_ERROR',
+        payload: error.message || 'Registration failed',
+      });
       throw error;
     }
   };
@@ -136,6 +194,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      localStorage.removeItem('letschat_token');
+      localStorage.removeItem('letschat_user');
       dispatch({ type: 'CLEAR_AUTH' });
     }
   };
@@ -149,12 +209,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  const clearError = () => {
+    dispatch({ type: 'CLEAR_ERROR' });
+  };
+
   const value: AuthContextType = {
     ...state,
     login,
     register,
     logout,
     updateProfile,
+    clearError,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

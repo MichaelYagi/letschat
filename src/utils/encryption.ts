@@ -1,5 +1,5 @@
-import crypto from 'crypto';
 import forge from 'node-forge';
+import crypto from 'crypto';
 import { config } from '../config';
 
 export class EncryptionService {
