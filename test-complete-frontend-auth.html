@@ -1,0 +1,164 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Complete Frontend Auth Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .success {
+        color: green;
+      }
+      .error {
+        color: red;
+      }
+      .section {
+        margin: 20px 0;
+        padding: 10px;
+        border: 1px solid #ccc;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+      }
+      pre {
+        background: #f5f5f5;
+        padding: 10px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Complete Frontend Auth Test</h1>
+    <div id="output"></div>
+
+    <div class="section">
+      <h3>Manual Test Steps</h3>
+      <button onclick="testRegistration()">Test Registration</button>
+      <button onclick="testLogin()">Test Login</button>
+      <button onclick="testTokenValidation()">Test Token Validation</button>
+      <button onclick="clearStorage()">Clear Storage</button>
+    </div>
+
+    <script>
+      const API_BASE = 'http://localhost:3000';
+      const output = document.getElementById('output');
+
+      function log(message, isError = false) {
+        const div = document.createElement('div');
+        div.className = isError ? 'error' : 'success';
+        div.innerHTML = message;
+        output.appendChild(div);
+      }
+
+      function logObject(title, obj) {
+        log(`<h4>${title}</h4><pre>${JSON.stringify(obj, null, 2)}</pre>`);
+      }
+
+      const testUser = {
+        username: `testuser_${Date.now().toString().slice(-6)}`,
+        email: `test_${Date.now().toString().slice(-6)}@example.com`,
+        password: 'TestPassword123!',
+      };
+
+      async function testRegistration() {
+        try {
+          log('🔄 Testing registration...');
+          const response = await fetch(`${API_BASE}/api/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(testUser),
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.data?.token) {
+            localStorage.setItem('letschat_token', data.data.token);
+            logObject('✅ Registration Success', {
+              username: data.data.user.username,
+              userId: data.data.user.id,
+              tokenLength: data.data.token.length,
+            });
+          } else {
+            logObject('❌ Registration Failed', data);
+          }
+        } catch (error) {
+          log(`❌ Registration Error: ${error.message}`, true);
+        }
+      }
+
+      async function testLogin() {
+        try {
+          log('🔄 Testing login...');
+          const response = await fetch(`${API_BASE}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: testUser.username,
+              password: testUser.password,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.data?.token) {
+            localStorage.setItem('letschat_token', data.data.token);
+            logObject('✅ Login Success', {
+              username: data.data.user.username,
+              userId: data.data.user.id,
+              tokenLength: data.data.token.length,
+            });
+          } else {
+            logObject('❌ Login Failed', data);
+          }
+        } catch (error) {
+          log(`❌ Login Error: ${error.message}`, true);
+        }
+      }
+
+      function testTokenValidation() {
+        try {
+          log('🔄 Testing token validation (AuthContext logic)...');
+          const token = localStorage.getItem('letschat_token');
+
+          if (!token) {
+            log('❌ No token found in localStorage', true);
+            return;
+          }
+
+          // Simulate AuthContext validation
+          const tokenParts = token.split('.');
+          if (tokenParts.length !== 3) {
+            throw new Error('Invalid token structure');
+          }
+
+          const userData = JSON.parse(atob(tokenParts[1]));
+          if (userData.id && userData.username) {
+            const user = {
+              id: userData.id,
+              username: userData.username,
+              status: 'online',
+              lastSeen: new Date().toISOString(),
+            };
+            logObject('✅ Token Validation Success', user);
+          } else {
+            throw new Error('Invalid token format');
+          }
+        } catch (error) {
+          log(`❌ Token Validation Error: ${error.message}`, true);
+        }
+      }
+
+      function clearStorage() {
+        localStorage.removeItem('letschat_token');
+        localStorage.removeItem('letschat_user');
+        output.innerHTML = '';
+        log('🗑️ Storage cleared');
+      }
+
+      log('🚀 Ready for testing. Use the buttons above.');
+      log(`📝 Test user: ${testUser.username}`);
+    </script>
+  </body>
+</html>

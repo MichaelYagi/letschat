@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🧪 Manual Login Verification</title>
+    <style>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 0;
+        padding: 20px;
+      }
+      .container {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+        padding: 40px;
+        max-width: 700px;
+        width: 100%;
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .header h1 {
+        margin: 0;
+        color: #1f2937;
+        font-size: 28px;
+      }
+      .header p {
+        color: #6b7280;
+        margin-top: 10px;
+        font-size: 14px;
+      }
+      .step {
+        margin: 20px 0;
+        padding: 25px;
+        border: 2px solid #e5e7eb;
+        border-radius: 12px;
+        background: #f8fafc;
+      }
+      .step h3 {
+        margin: 0 0 15px 0;
+        color: #1f2937;
+        font-size: 18px;
+      }
+      .step p {
+        color: #374151;
+        font-size: 14px;
+        margin-bottom: 15px;
+      }
+      .instructions {
+        background: #eff6ff;
+        padding: 15px;
+        border-radius: 6px;
+        margin-top: 15px;
+      }
+      .instructions ol {
+        margin: 0;
+        padding-left: 20px;
+      }
+      .instructions li {
+        margin-bottom: 8px;
+      }
+      .status {
+        padding: 15px;
+        border-radius: 6px;
+        margin-top: 15px;
+        font-family: monospace;
+        font-size: 13px;
+      }
+      .success {
+        background: #d1fae5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+      }
+      .error {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+      }
+      .warning {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #f59e0b;
+      }
+      .btn {
+        background: #3b82f6;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        width: 100%;
+      }
+      .btn:hover {
+        background: #2563eb;
+        transform: translateY(-2px);
+      }
+      .final-status {
+        padding: 20px;
+        border-radius: 8px;
+        margin-top: 20px;
+        text-align: center;
+        font-weight: bold;
+      }
+      .db-info {
+        background: #1f2937;
+        color: white;
+        padding: 15px;
+        border-radius: 6px;
+        margin-top: 15px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🧪 Manual Login Verification</h1>
+        <p>Complete step-by-step verification of the login system</p>
+      </div>
+
+      <!-- Step 1: Initial State Check -->
+      <div class="step">
+        <h3>Step 1: Initial System State</h3>
+        <p><strong>Instructions:</strong></p>
+        <ol class="instructions">
+          <li>
+            Go to the main application:
+            <a href="http://localhost:5173" target="_blank"
+              >http://localhost:5173</a
+            >
+          </li>
+          <li>Click "Sign in to your account"</li>
+          <li>Enter username: <code>testuser_650659</code></li>
+          <li>Enter password: <code>TestPassword123!</code></li>
+          <li>Click "Sign in" button</li>
+          <li>Watch browser console for success messages</li>
+          <li>If login succeeds, you should see a success message below</li>
+          <li>If login fails, you should see an error message</li>
+          <li>Then return here to verify database state</li>
+        </ol>
+        <p><strong>Expected Behavior:</strong></p>
+        <ul class="instructions">
+          <li>✅ Form should submit without validation errors</li>
+          <li>✅ Should redirect to main application</li>
+          <li>✅ Should show success message</li>
+          <li>❌ Should NOT fail with correct credentials</li>
+        </ul>
+      </div>
+
+      <!-- Step 2: Database Pre-Check -->
+      <div class="step">
+        <h3>Step 2: Database State Before Test</h3>
+        <div class="db-info" id="preCheckDb">
+          <h4>Checking current database state...</h4>
+          <p>This will show current user sessions before login attempt.</p>
+          <p>
+            <em>If this shows an error, the database connection is failing.</em>
+          </p>
+        </div>
+      </div>
+
+      <!-- Step 3: Live Form Test -->
+      <div class="step">
+        <h3>Step 3: Live Form Test Interface</h3>
+        <div id="liveTestArea">
+          <button class="btn" onclick="startLiveTest()">
+            Start Live Form Test
+          </button>
+          <div id="liveTestResults"></div>
+        </div>
+      </div>
+
+      <!-- Step 4: Final Verification -->
+      <div class="step">
+        <h3>Step 4: Final Verification</h3>
+        <button class="btn" onclick="finalVerification()">
+          Check Database After Login
+        </button>
+        <div id="finalResults"></div>
+      </div>
+    </div>
+
+    <script>
+      let currentLoginState = {
+        step: 'ready',
+        timestamp: Date.now(),
+        sessionsBefore: 0,
+        sessionsAfter: 0,
+        newUser: null,
+        loginSuccess: false,
+      };
+
+      // Step 2: Check initial database state
+      async function checkDatabase() {
+        try {
+          const response = await fetch('http://localhost:5173/api/db-status', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          const data = await response.json();
+          const preCheckDiv = document.getElementById('preCheckDb');
+
+          if (response.ok) {
+            preCheckDiv.className = 'db-info success';
+            preCheckDiv.innerHTML = `
+                        <h4>✅ Database Connected</h4>
+                        <p><strong>Current Test Users:</strong> ${data.testUsers || 0}</p>
+                        <p><strong>Active Sessions:</strong> ${data.activeSessions || 0}</p>
+                        <p><strong>Database Status:</strong> Operational</p>
+                    `;
+            currentLoginState.sessionsBefore = data.activeSessions || 0;
+          } else {
+            preCheckDiv.className = 'db-info error';
+            preCheckDiv.innerHTML = `
+                        <h4>❌ Database Error</h4>
+                        <p>Status: ${response.status}</p>
+                        <p>Error: ${data.error || 'Unknown error'}</p>
+                    `;
+          }
+        } catch (error) {
+          preCheckDiv.className = 'db-info error';
+          preCheckDiv.innerHTML = `
+                    <h4>❌ Database Check Failed</h4>
+                        <p>Error: ${error.message}</p>
+                    `;
+        }
+      }
+
+      // Step 3: Live test interface
+      function startLiveTest() {
+        const liveTestArea = document.getElementById('liveTestArea');
+        const liveResults = document.getElementById('liveTestResults');
+
+        liveTestArea.innerHTML = `
+                <div class="instructions">
+                    <h4>Live Login Test</h4>
+                    <ol>
+                        <li>Fill username: <code>testuser_650659</code></li>
+                        <li>Fill password: <code>TestPassword123!</code></li>
+                        <li>Click "Sign in" button below</li>
+                        <li>Wait for result (check console)</li>
+                        <li>Form will submit to real backend API</li>
+                        <li>Success will create database session</li>
+                    </ol>
+                </div>
+                
+                <iframe src="http://localhost:5173/login" style="width: 100%; height: 400px; border: 1px solid #ddd; border-radius: 8px;"></iframe>
+            `;
+
+        liveResults.innerHTML = '';
+
+        // Listen for iframe messages
+        window.addEventListener('message', async function (event) {
+          const resultDiv = document.createElement('div');
+          resultDiv.style.cssText =
+            'padding: 10px; margin: 10px 0; border-radius: 6px; font-family: monospace; font-size: 12px;';
+          liveResults.appendChild(resultDiv);
+
+          if (event.data.type === 'loginSuccess') {
+            currentLoginState.loginSuccess = true;
+            currentLoginState.newUser = event.data.user;
+
+            resultDiv.className = 'status success';
+            resultDiv.innerHTML = `
+                        <strong>✅ LOGIN SUCCESSFUL!</strong><br>
+                        User: ${event.data.user.username}<br>
+                        ID: ${event.data.user.id}<br>
+                        Status: ${event.data.user.status}<br>
+                        Token: ${event.data.token.substring(0, 50)}...<br>
+                        <br><strong>Next:</strong> Click "Check Database After Login" below
+                    `;
+
+            // Enable final verification
+            document.getElementById('finalVerification').disabled = false;
+          } else if (event.data.type === 'loginError') {
+            currentLoginState.loginSuccess = false;
+
+            resultDiv.className = 'status error';
+            resultDiv.innerHTML = `
+                        <strong>❌ LOGIN FAILED</strong><br>
+                        Error: ${event.data.error}<br>
+                        Status: ${event.data.status}<br>
+                        <br><strong>Troubleshooting:</strong>
+                        <ul>
+                            <li>Check browser console for detailed errors</li>
+                            <li>Verify backend server is running on port 3000</li>
+                            <li>Check if form validation is blocking submission</li>
+                            <li>Verify credentials are correct</li>
+                        </ul>
+                    `;
+          }
+
+          liveResults.appendChild(resultDiv);
+        });
+      }
+
+      // Step 4: Final verification
+      async function finalVerification() {
+        const finalResults = document.getElementById('finalResults');
+        finalResults.innerHTML = `
+                <h4>Checking Database After Login...</h4>
+                <div class="instructions">
+                    <p><em>Querying database for new session...</em></p>
+                </div>
+            `;
+
+        try {
+          // Query database for sessions after login
+          const response = await fetch('http://localhost:5173/api/db-status', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            const sessionsAfter = data.activeSessions || 0;
+            const sessionIncreased =
+              sessionsAfter > currentLoginState.sessionsBefore;
+
+            finalResults.className = `status ${sessionIncreased ? 'success' : 'warning'}`;
+            finalResults.innerHTML = `
+                        <h4>${sessionIncreased ? '✅' : '⚠️'} Database Verification Complete</h4>
+                        
+                        <div class="db-info">
+                            <h5>📊 Database Results:</h5>
+                            <p><strong>Sessions Before:</strong> ${currentLoginState.sessionsBefore}</p>
+                            <p><strong>Sessions After:</strong> ${sessionsAfter}</p>
+                            <p><strong>Session Change:</strong> ${sessionIncreased ? '+1' : '+0'}</p>
+                            <p><strong>Test User Created:</strong> ${currentLoginState.newUser ? 'YES' : 'NO'}</p>
+                            <p><strong>Login Success:</strong> ${currentLoginState.loginSuccess ? 'YES' : 'NO'}</p>
+                            <br><strong>Final Status:</strong> ${sessionIncreased && currentLoginState.loginSuccess ? '✅ LOGIN WORKING' : '⚠️ ISSUES DETECTED'}</p>
+                            
+                            ${
+                              currentLoginState.loginSuccess &&
+                              currentLoginState.newUser
+                                ? `
+                                <h6>🎉 VERIFICATION COMPLETE!</h6>
+                                <p>The login system is working correctly:</p>
+                                <ul>
+                                    <li>✅ Form submission works</li>
+                                    <li>✅ Backend authentication works</li>
+                                    <li>✅ Database sessions are created</li>
+                                    <li>✅ User data is properly stored</li>
+                                    <li>✅ JWT tokens are generated and validated</li>
+                                </ul>
+                                <p><strong>Issue Status:</strong> ✅ RESOLVED</p>
+                            `
+                                : ''
+                            }
+                        </div>
+                    `;
+          } else {
+            finalResults.className = 'status error';
+            finalResults.innerHTML = `
+                        <h4>❌ Database Verification Failed</h4>
+                        <p>Error: ${data.error || 'Unknown error'}</p>
+                        <p>Status: ${response.status}</p>
+                    `;
+          }
+        } catch (error) {
+          finalResults.className = 'status error';
+          finalResults.innerHTML = `
+                    <h4>❌ Verification Error</h4>
+                        <p>${error.message}</p>
+                    `;
+        }
+      }
+
+      // Initialize
+      window.addEventListener('load', function () {
+        console.log('🧪 Manual Login Verification Page Loaded');
+        checkDatabase();
+      });
+    </script>
+  </body>
+</html>

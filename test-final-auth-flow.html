@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Final Auth Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .success {
+        color: green;
+        font-weight: bold;
+      }
+      .error {
+        color: red;
+        font-weight: bold;
+      }
+      .test-section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      button {
+        padding: 10px 15px;
+        margin: 5px;
+        cursor: pointer;
+      }
+      pre {
+        background: #f5f5f5;
+        padding: 10px;
+        border-radius: 3px;
+        overflow-x: auto;
+      }
+      .status {
+        padding: 5px 10px;
+        margin: 5px 0;
+        border-radius: 3px;
+      }
+      .status.success {
+        background: #d4edda;
+        color: #155724;
+      }
+      .status.error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🧪 Final Authentication Test</h1>
+    <p>
+      Testing complete auth flow from port <strong>5174</strong> → backend
+      <strong>3000</strong>
+    </p>
+
+    <div id="results"></div>
+
+    <script>
+      const results = document.getElementById('results');
+
+      function log(title, message, isSuccess = true) {
+        const div = document.createElement('div');
+        div.className = `test-section`;
+        div.innerHTML = `
+                <h3>${title}</h3>
+                <div class="status ${isSuccess ? 'success' : 'error'}">
+                    ${isSuccess ? '✅ SUCCESS' : '❌ FAILED'}
+                </div>
+                <pre>${message}</pre>
+            `;
+        results.appendChild(div);
+      }
+
+      async function testCompleteFlow() {
+        // Test 1: Backend Health
+        try {
+          const response = await fetch('/api/health');
+          const data = await response.json();
+          log(
+            '1. Backend Health Check',
+            JSON.stringify(data, null, 2),
+            response.ok
+          );
+        } catch (error) {
+          log('1. Backend Health Check', error.message, false);
+        }
+
+        // Test 2: Registration
+        const testUser = {
+          username: `finaltest_${Date.now().toString().slice(-6)}`,
+          email: `final_${Date.now().toString().slice(-6)}@test.com`,
+          password: 'TestPassword123!',
+        };
+
+        try {
+          const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(testUser),
+          });
+          const data = await response.json();
+          if (response.ok && data.data?.token) {
+            localStorage.setItem('letschat_token', data.data.token);
+            log(
+              '2. Registration',
+              `✅ User created: ${data.data.user.username}\\nToken stored: ${data.data.token.substring(0, 50)}...`,
+              true
+            );
+          } else {
+            log('2. Registration', JSON.stringify(data, null, 2), false);
+          }
+        } catch (error) {
+          log('2. Registration', error.message, false);
+        }
+
+        // Test 3: Login with same user
+        try {
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: testUser.username,
+              password: testUser.password,
+            }),
+          });
+          const data = await response.json();
+          if (response.ok && data.data?.token) {
+            localStorage.setItem('letschat_token', data.data.token);
+            log(
+              '3. Login',
+              `✅ User logged in: ${data.data.user.username}\\nNew token: ${data.data.token.substring(0, 50)}...`,
+              true
+            );
+          } else {
+            log('3. Login', JSON.stringify(data, null, 2), false);
+          }
+        } catch (error) {
+          log('3. Login', error.message, false);
+        }
+
+        // Test 4: Token Validation (AuthContext logic)
+        try {
+          const token = localStorage.getItem('letschat_token');
+          if (token) {
+            const tokenParts = token.split('.');
+            if (tokenParts.length === 3) {
+              const payload = JSON.parse(atob(tokenParts[1]));
+              if (payload.id && payload.username) {
+                log(
+                  '4. Token Validation',
+                  `✅ Valid JWT structure\\nUser ID: ${payload.id}\\nUsername: ${payload.username}`,
+                  true
+                );
+              } else {
+                log('4. Token Validation', '❌ Invalid token format', false);
+              }
+            } else {
+              log('4. Token Validation', '❌ Invalid JWT structure', false);
+            }
+          } else {
+            log('4. Token Validation', '❌ No token found', false);
+          }
+        } catch (error) {
+          log('4. Token Validation', error.message, false);
+        }
+
+        // Test 5: Authenticated API Call
+        try {
+          const token = localStorage.getItem('letschat_token');
+          const response = await fetch('/api/health', {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          log(
+            '5. Authenticated API Call',
+            response.ok
+              ? '✅ Authenticated request successful'
+              : '❌ Auth failed',
+            response.ok
+          );
+        } catch (error) {
+          log('5. Authenticated API Call', error.message, false);
+        }
+      }
+
+      // Run tests when page loads
+      testCompleteFlow();
+    </script>
+  </body>
+</html>

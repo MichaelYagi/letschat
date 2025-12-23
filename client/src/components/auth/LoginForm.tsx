@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useState, FormEvent } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -11,20 +10,25 @@ interface LoginFormData {
 export function LoginForm() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [error, setError] = useState('');
+  const [loginError, setLoginError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { register, handleSubmit, formState } = useForm<LoginFormData>();
-  const { errors } = formState;
 
-  const onSubmit = async (data: LoginFormData) => {
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setLoading(true);
-    setError('');
+    setLoginError('');
 
     try {
-      await login({ username: data.username, password: data.password });
-      navigate('/');
+      const formData = new FormData(e.currentTarget);
+      const username = formData.get('username') as string;
+      const password = formData.get('password') as string;
+
+      if (username && password) {
+        await login({ username, password });
+        navigate('/');
+      }
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      setLoginError(err.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -48,10 +52,10 @@ export function LoginForm() {
           </p>
         </div>
 
-        <form className='mt-8 space-y-6' onSubmit={handleSubmit(onSubmit)}>
-          {error && (
+        <form onSubmit={onSubmit} className='mt-8 space-y-6'>
+          {loginError && (
             <div className='rounded-md bg-red-50 p-4'>
-              <div className='text-sm text-red-800'>{error}</div>
+              <div className='text-sm text-red-800'>{loginError}</div>
             </div>
           )}
 
@@ -68,13 +72,8 @@ export function LoginForm() {
                 type='text'
                 autoComplete='username'
                 className='appearance-none block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm'
-                {...register('username')}
+                name='username'
               />
-              {errors.username && (
-                <p className='mt-2 text-sm text-red-600'>
-                  {errors.username.message}
-                </p>
-              )}
             </div>
           </div>
 
@@ -91,13 +90,8 @@ export function LoginForm() {
                 type='password'
                 autoComplete='current-password'
                 className='appearance-none block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm'
-                {...register('password')}
+                name='password'
               />
-              {errors.password && (
-                <p className='mt-2 text-sm text-red-600'>
-                  {errors.password.message}
-                </p>
-              )}
             </div>
           </div>
 

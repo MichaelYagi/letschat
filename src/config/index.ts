@@ -57,6 +57,9 @@ export const config = {
   },
 
   cors: {
-    origin: process.env.DEV_CORS_ORIGIN || 'http://localhost:5173',
+    origin: process.env.DEV_CORS_ORIGIN || [
+      'http://localhost:5173',
+      'http://localhost:5174',
+    ],
   },
 };

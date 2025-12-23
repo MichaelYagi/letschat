@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>🧪 Login Form Test</title>
+    <script>
+      // Test the login form directly
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          try {
+            const username = 'testuser_650659';
+            const password = 'TestPassword123!';
+
+            console.log('🧪 Testing login form...');
+
+            // Find the form
+            const form = document.querySelector('form');
+            if (!form) {
+              console.error('Form not found');
+              return;
+            }
+
+            // Fill form and submit
+            const usernameInput = form.querySelector('input[name="username"]');
+            const passwordInput = form.querySelector('input[name="password"]');
+            const submitBtn = form.querySelector('button[type="submit"]');
+
+            if (usernameInput && passwordInput) {
+              usernameInput.value = username;
+              passwordInput.value = password;
+
+              console.log('Submitting form...');
+
+              // Submit the form
+              if (submitBtn) {
+                submitBtn.click();
+              }
+
+              // Check for result
+              setTimeout(function () {
+                const errorDiv = document.querySelector('.text-red-800');
+                const successElements =
+                  document.querySelectorAll('.text-green-600');
+
+                if (errorDiv) {
+                  console.error('❌ Login failed:', errorDiv.textContent);
+                } else if (successElements.length > 0) {
+                  console.log(
+                    '✅ Login successful - check browser for redirect'
+                  );
+                } else {
+                  console.log(
+                    '⚠️ Form submitted but no visible success indicator'
+                  );
+                }
+              }, 3000);
+            } else {
+              console.error('Form inputs not found');
+            }
+          } catch (error) {
+            console.error('Test error:', error);
+          }
+        }, 2000);
+      });
+    </script>
+  </head>
+  <body>
+    <h1>🧪 Login Form Test</h1>
+    <p>Wait 2 seconds for test to begin...</p>
+    <p>Open browser console to see results.</p>
+  </body>
+</html>

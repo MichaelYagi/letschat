@@ -118,12 +118,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
             const tokenParts = token.split('.');
             if (tokenParts.length === 3) {
               const userData = JSON.parse(atob(tokenParts[1]));
-              if (userData.userId && userData.username) {
+              if (userData.id && userData.username) {
                 dispatch({
                   type: 'SET_AUTH',
                   payload: {
                     user: {
-                      id: userData.userId.toString(),
+                      id: userData.id,
                       username: userData.username,
                       status: 'online',
                       lastSeen: new Date().toISOString(),

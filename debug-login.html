@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🔍 Login Debug Console</title>
+    <style>
+      body {
+        font-family: monospace;
+        background: #1a1a1a;
+        color: #ffffff;
+        margin: 0;
+        padding: 20px;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .section {
+        margin: 20px 0;
+        padding: 20px;
+        border: 1px solid #333;
+        border-radius: 8px;
+      }
+      .status {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+      }
+      .success {
+        background: #10b981;
+      }
+      .error {
+        background: #ef4444;
+      }
+      .warning {
+        background: #f59e0b;
+      }
+      .info {
+        background: #3b82f6;
+      }
+      .logs {
+        background: #000;
+        padding: 15px;
+        border-radius: 4px;
+        font-size: 12px;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      .btn {
+        background: #3b82f6;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      .btn:hover {
+        background: #2563eb;
+      }
+      input {
+        background: #333;
+        border: 1px solid #555;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 4px;
+        margin: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="section">
+        <h2>🔍 Real Login Debug Console</h2>
+        <p>
+          This will test login exactly like the real app and show detailed
+          console output.
+        </p>
+
+        <div>
+          <input
+            type="text"
+            id="username"
+            placeholder="Username"
+            value="testuser_650659"
+            style="width: 200px"
+          />
+          <input
+            type="password"
+            id="password"
+            placeholder="Password"
+            value="TestPassword123!"
+            style="width: 200px"
+          />
+          <button class="btn" onclick="testLogin()">🚀 Test Login</button>
+          <button class="btn" onclick="clearConsole()">🗑️ Clear</button>
+        </div>
+
+        <div id="status" class="status info" style="display: none"></div>
+
+        <div class="logs" id="logs">
+          <div class="info status">🔄 Ready to test login...</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = '/api';
+      let logCount = 0;
+
+      function log(message, type = 'info') {
+        const logsDiv = document.getElementById('logs');
+        const statusDiv = document.getElementById('status');
+        const timestamp = new Date().toLocaleTimeString();
+
+        const logEntry = document.createElement('div');
+        logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+        logsDiv.appendChild(logEntry);
+
+        if (type !== 'info') {
+          statusDiv.innerHTML = message;
+          statusDiv.className = `status ${type}`;
+          statusDiv.style.display = 'block';
+        }
+
+        logsDiv.scrollTop = logsDiv.scrollHeight;
+        logCount++;
+      }
+
+      function clearConsole() {
+        document.getElementById('logs').innerHTML =
+          '<div class="info status">🔄 Console cleared...</div>';
+        document.getElementById('status').style.display = 'none';
+        logCount = 0;
+      }
+
+      async function testLogin() {
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+
+        if (!username || !password) {
+          log('❌ Please enter username and password', 'error');
+          return;
+        }
+
+        log(`🚀 Starting login test for user: ${username}`);
+        log(`📤 Sending request to: ${API_BASE}/auth/login`);
+
+        try {
+          // Show exact request details
+          const requestData = JSON.stringify({ username, password });
+          log(`📦 Request body: ${requestData}`);
+          log(`📡 Headers: Content-Type: application/json`);
+
+          log('⏳ Waiting for response...');
+
+          const response = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: requestData,
+          });
+
+          log(`📡 Response status: ${response.status} ${response.statusText}`);
+          log(
+            `📡 Response headers: ${JSON.stringify([...response.headers.entries()])}`
+          );
+
+          const responseText = await response.text();
+          log(`📡 Raw response: ${responseText}`);
+
+          let data;
+          try {
+            data = JSON.parse(responseText);
+            log(`📦 Parsed JSON: ${JSON.stringify(data, null, 2)}`);
+          } catch (e) {
+            log(`❌ JSON parse failed: ${e.message}`, 'error');
+            data = null;
+          }
+
+          if (
+            response.ok &&
+            data &&
+            data.data &&
+            data.data.token &&
+            data.data.user
+          ) {
+            log('✅ Login successful! Token received', 'success');
+            log(`👤 User: ${data.data.user.username} (${data.data.user.id})`);
+            log(`🔐 Token length: ${data.data.token.length}`);
+            log(`💾 Storing token to localStorage...`);
+
+            localStorage.setItem('letschat_token', data.data.token);
+            localStorage.setItem(
+              'letschat_user',
+              JSON.stringify(data.data.user)
+            );
+
+            log('🧪 Testing stored token...');
+            const storedToken = localStorage.getItem('letschat_token');
+            const storedUser = localStorage.getItem('letschat_user');
+
+            if (storedToken && storedUser) {
+              log('✅ Token stored successfully');
+              log(`🔐 Stored token: ${storedToken.substring(0, 50)}...`);
+
+              // Test authenticated request immediately
+              log('🔄 Testing authenticated request...');
+              const authResponse = await fetch('/api/health', {
+                headers: {
+                  Authorization: `Bearer ${storedToken}`,
+                },
+              });
+
+              if (authResponse.ok) {
+                log('✅ Authenticated request works!', 'success');
+                log('🎉 LOGIN FULLY FUNCTIONAL!');
+              } else {
+                log(
+                  `❌ Authenticated request failed: ${authResponse.status}`,
+                  'error'
+                );
+              }
+            } else {
+              log('❌ Token storage failed', 'error');
+            }
+          } else {
+            log('❌ Login failed!', 'error');
+            log(`Status: ${response.status}`);
+            log(`Data: ${JSON.stringify(data)}`);
+
+            if (response.status === 0) {
+              log(
+                '🌐 Network error - check if frontend can reach backend',
+                'error'
+              );
+            }
+          }
+        } catch (error) {
+          log(`❌ Exception: ${error.message}`, 'error');
+          log(`Stack: ${error.stack}`);
+        }
+      }
+
+      // Initialize
+      log('🔍 Debug console loaded');
+      log('📋 Test user pre-filled: testuser_650659');
+      log('🌐 API endpoint: /api/auth/login');
+      log('⚡ Click "Test Login" to begin');
+    </script>
+  </body>
+</html>

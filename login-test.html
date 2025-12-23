@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🧪 Live Login Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f5f5f5;
+        margin: 0;
+        padding: 20px;
+      }
+      .test-container {
+        max-width: 400px;
+        margin: 0 auto;
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+      .form {
+        margin-bottom: 20px;
+      }
+      .input {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .btn {
+        width: 100%;
+        padding: 12px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .btn:hover {
+        background: #0056b3;
+      }
+      .result {
+        margin-top: 20px;
+        padding: 15px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="test-container">
+      <h2>🧪 Live Login Test</h2>
+      <form id="loginForm" class="form">
+        <div>
+          <input
+            type="text"
+            id="username"
+            class="input"
+            placeholder="Username"
+            value="testuser_650659"
+          />
+        </div>
+        <div>
+          <input
+            type="password"
+            id="password"
+            class="input"
+            placeholder="Password"
+            value="TestPassword123!"
+          />
+        </div>
+        <button type="submit" class="btn" onclick="performLogin()">
+          🔑 Login
+        </button>
+      </form>
+      <div id="result"></div>
+
+      <h3>📋 Instructions:</h3>
+      <p>1. Click "Login" button above</p>
+      <p>2. Check if authentication succeeds</p>
+      <p>3. Verify database session created</p>
+
+      <h3>🗃️ Database Check:</h3>
+      <p>Current sessions in database:</p>
+      <p>
+        <strong>Before test: <code>8</code> sessions</strong>
+      </p>
+      <p>
+        <strong
+          >Expected after successful login: <code>9</code> sessions</strong
+        >
+      </p>
+    </div>
+
+    <script>
+      async function performLogin() {
+        const result = document.getElementById('result');
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        if (!username || !password) {
+          result.className = 'result error';
+          result.innerHTML = '❌ Please enter both username and password';
+          return;
+        }
+
+        result.className = 'result';
+        result.innerHTML = '🔄 Logging in...';
+
+        try {
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.success && data.data && data.data.token) {
+            // Simulate token storage and state update
+            localStorage.setItem('letschat_token', data.data.token);
+            localStorage.setItem(
+              'letschat_user',
+              JSON.stringify(data.data.user)
+            );
+
+            result.className = 'result success';
+            result.innerHTML = `
+                        <h3>✅ Login Successful!</h3>
+                        <p><strong>User:</strong> ${data.data.user.username}</p>
+                        <p><strong>ID:</strong> ${data.data.user.id}</p>
+                        <p><strong>Status:</strong> ${data.data.user.status}</p>
+                        <p><strong>Token:</strong> ${data.data.token.substring(0, 50)}...</p>
+                        <p>✅ Authenticated successfully!</p>
+                        
+                        <div style="margin-top: 20px; padding: 10px; background: #e8f5ea; border-radius: 4px;">
+                            <p><strong>🔐 Next:</strong> Click F5 or navigate away to verify main app</p>
+                        </div>
+                    `;
+          } else {
+            result.className = 'result error';
+            result.innerHTML = `
+                        <h3>❌ Login Failed</h3>
+                        <p><strong>Status:</strong> ${response.status}</p>
+                        <p><strong>Error:</strong> ${data.error || 'Unknown error'}</p>
+                        <p><strong>Response:</strong></p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+          }
+        } catch (error) {
+          result.className = 'result error';
+          result.innerHTML = `
+                    <h3>❌ Network Error</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                    `;
+        }
+      }
+
+      // Auto-check database
+      async function checkDatabase() {
+        try {
+          const response = await fetch('/api/health');
+          document.getElementById('dbCheck').innerHTML =
+            'Database connection: ' +
+            (response.ok ? '✅ Connected' : '❌ Failed');
+        } catch (error) {
+          document.getElementById('dbCheck').innerHTML =
+            'Database check error: ' + error.message;
+        }
+      }
+
+      checkDatabase();
+    </script>
+  </body>
+</html>

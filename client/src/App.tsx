@@ -16,7 +16,7 @@ import { UserProfile } from './components/UserProfile';
 import { NotificationSettings } from './components/NotificationSettings';
 import { RegistrationDebug } from './components/debug/RegistrationDebug';
 import { AuthProvider } from './contexts/AuthContext';
-import { useAuth } from './hooks/useAuth';
+import { useAuth } from './contexts/AuthContext';
 
 function App() {
   return (

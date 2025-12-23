@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Auth Test</title>
+  </head>
+  <body>
+    <h1>Testing Auth Token Validation</h1>
+    <div id="output"></div>
+
+    <script>
+      // Simulate the token validation logic from AuthContext
+      const testToken =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjdjNmM0MzMxLTRiNTUtNDJhMC04NDA1LWUwY2NiMDM5MTk0MCIsInVzZXJuYW1lIjoidGVzdHVzZXJfNjUwNjU5IiwiaWF0IjoxNzY2NDQ3NjUxLCJleHAiOjE3NjY1MzQwNTEsImF1ZCI6ImxldHNjaGF0LXVzZXJzIiwiaXNzIjoibGV0c2NoYXQifQ.X4CRmRwBLgE9bIBKOFjLRzQcywdaLui2fmVa66wM42s';
+
+      function validateToken(token) {
+        try {
+          const tokenParts = token.split('.');
+          if (tokenParts.length !== 3) {
+            throw new Error('Invalid token structure');
+          }
+
+          const userData = JSON.parse(atob(tokenParts[1]));
+          console.log('Token payload:', userData);
+
+          if (userData.id && userData.username) {
+            return {
+              success: true,
+              user: {
+                id: userData.id,
+                username: userData.username,
+                status: 'online',
+                lastSeen: new Date().toISOString(),
+              },
+            };
+          } else {
+            throw new Error('Invalid token format');
+          }
+        } catch (error) {
+          return { success: false, error: error.message };
+        }
+      }
+
+      const result = validateToken(testToken);
+      document.getElementById('output').innerHTML = `
+            <h3>Result: ${result.success ? '✅ SUCCESS' : '❌ FAILED'}</h3>
+            <pre>${JSON.stringify(result, null, 2)}</pre>
+        `;
+    </script>
+  </body>
+</html>
