@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+  <head>
+    <title>WebSocket CORS Test</title>
+  </head>
+  <body>
+    <h1>WebSocket CORS Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="logs"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const statusDiv = document.getElementById('status');
+      const logsDiv = document.getElementById('logs');
+
+      function log(message) {
+        console.log(message);
+        logsDiv.innerHTML +=
+          '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+      }
+
+      // Test token - you'll need to get a valid token from your app
+      const testToken =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3Yjk3ZmY2LWZlODctOTRmLWM2YjFmY2MjE3Y2MjIiLCJ1cWF0IjoxNzY2NTA2NDEyLCJleHAiOjE3NjU5Mjk2NCwiYXVkIjoibGV0c2NoYXQtdXNlcnMiLCJpc3MiOiJsZXRzY2hhdCJ9.invalid-token-for-testing';
+
+      try {
+        log('Attempting to connect to WebSocket...');
+        const socket = io('http://localhost:3000', {
+          auth: {
+            token: testToken,
+          },
+          transports: ['websocket', 'polling'],
+        });
+
+        socket.on('connect', () => {
+          log('✅ Connected to WebSocket successfully!');
+          statusDiv.textContent = 'Connected';
+          statusDiv.style.color = 'green';
+        });
+
+        socket.on('connect_error', error => {
+          log('❌ Connection error: ' + error.message);
+          statusDiv.textContent = 'Connection Error';
+          statusDiv.style.color = 'red';
+        });
+
+        socket.on('disconnect', reason => {
+          log('🔌 Disconnected: ' + reason);
+          statusDiv.textContent = 'Disconnected';
+          statusDiv.style.color = 'orange';
+        });
+      } catch (error) {
+        log('❌ Error creating socket: ' + error.message);
+        statusDiv.textContent = 'Error';
+        statusDiv.style.color = 'red';
+      }
+    </script>
+  </body>
+</html>

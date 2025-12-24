@@ -17,17 +17,58 @@ const app = express();
 const server = createServer(app);
 const io = new SocketIOServer(server, {
   cors: {
-    origin: config.cors.origin,
+    origin: '*',
     methods: ['GET', 'POST'],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
   },
 });
 
-// Security middleware
-app.use(helmet());
+// Security middleware (configured for development)
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // Disable CSP for development
+    crossOriginEmbedderPolicy: false, // Allow cross-origin requests
+  })
+);
+
+// Handle preflight requests explicitly
+app.options('*', (req, res) => {
+  const allowedOrigins = Array.isArray(config.cors.origin)
+    ? config.cors.origin
+    : [config.cors.origin];
+
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header(
+      'Access-Control-Allow-Methods',
+      'GET, POST, PUT, DELETE, OPTIONS'
+    );
+    res.header(
+      'Access-Control-Allow-Headers',
+      'Origin, X-Requested-With, Content-Type, Accept, Authorization'
+    );
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+
+  res.sendStatus(200);
+});
+
 app.use(
   cors({
-    origin: config.cors.origin,
+    origin: Array.isArray(config.cors.origin)
+      ? config.cors.origin
+      : [config.cors.origin],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Origin',
+      'X-Requested-With',
+      'Content-Type',
+      'Accept',
+      'Authorization',
+    ],
   })
 );
 
@@ -73,4 +114,4 @@ server.listen(PORT, () => {
   logger.info(`Database: ${config.database.url}`);
 });
 
-export { app, server, io };
+export { app, server };

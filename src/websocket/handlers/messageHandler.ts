@@ -2,6 +2,8 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { authMiddleware } from '../../config/jwt';
 import { MessageService } from '../../services/MessageService';
 import { AuthService } from '../../services/AuthService';
+import { NotificationService } from '../../services/NotificationService';
+import WebSocketManager from '../WebSocketManager';
 import {
   WebSocketMessage,
   TypingEvent,
@@ -9,6 +11,7 @@ import {
   CreateMessageRequest,
   MessageReactionEvent,
 } from '../../types/Message';
+import { Notification } from '../../types/Notification';
 import { logger } from '../../utils/logger';
 
 interface AuthenticatedSocket extends Socket {
@@ -26,6 +29,9 @@ export class WebSocketService {
     this.setupMiddleware();
     this.setupEventHandlers();
     this.startHeartbeat();
+
+    // Register with WebSocketManager
+    WebSocketManager.getInstance().setWebSocketService(this);
   }
 
   /**
@@ -93,6 +99,12 @@ export class WebSocketService {
     socket.on('typing', data => this.handleTyping(socket, data));
     socket.on('mark_read', data => this.handleMarkRead(socket, data));
     socket.on('message_reaction', data => this.handleReaction(socket, data));
+    socket.on('mark_notification_read', data =>
+      this.handleMarkNotificationRead(socket, data)
+    );
+    socket.on('mark_all_notifications_read', () =>
+      this.handleMarkAllNotificationsRead(socket)
+    );
     socket.on('ping', () => this.handlePing(socket));
     socket.on('disconnect', () => this.handleDisconnect(socket));
   }
@@ -247,6 +259,56 @@ export class WebSocketService {
   }
 
   /**
+   * Handle notification marked as read
+   */
+  private async handleMarkNotificationRead(
+    socket: AuthenticatedSocket,
+    { notificationId }: { notificationId: string }
+  ): Promise<void> {
+    try {
+      const updated =
+        await NotificationService.markNotificationAsRead(notificationId);
+
+      if (updated) {
+        socket.emit('notification_marked_read', { notificationId });
+        logger.info(
+          `User ${socket.username} marked notification ${notificationId} as read`
+        );
+      } else {
+        socket.emit('error', {
+          message: 'Notification not found or already read',
+        });
+      }
+    } catch (error) {
+      logger.error('Error marking notification as read:', error);
+      socket.emit('error', { message: 'Failed to mark notification as read' });
+    }
+  }
+
+  /**
+   * Handle all notifications marked as read
+   */
+  private async handleMarkAllNotificationsRead(
+    socket: AuthenticatedSocket
+  ): Promise<void> {
+    try {
+      const count = await NotificationService.markAllNotificationsAsRead(
+        socket.userId!
+      );
+
+      socket.emit('all_notifications_marked_read', { count });
+      logger.info(
+        `User ${socket.username} marked ${count} notifications as read`
+      );
+    } catch (error) {
+      logger.error('Error marking all notifications as read:', error);
+      socket.emit('error', {
+        message: 'Failed to mark all notifications as read',
+      });
+    }
+  }
+
+  /**
    * Handle ping for connection health
    */
   private handlePing(socket: AuthenticatedSocket): void {
@@ -324,6 +386,28 @@ export class WebSocketService {
       userSockets.forEach(socket => {
         socket.emit(event, data);
       });
+    }
+  }
+
+  /**
+   * Send notification to specific user
+   */
+  public sendNotificationToUser(
+    userId: string,
+    notification: Notification
+  ): void {
+    this.sendToUser(userId, 'new_notification', { notification });
+  }
+
+  /**
+   * Send notification count update to user
+   */
+  public async updateNotificationCount(userId: string): Promise<void> {
+    try {
+      const counts = await NotificationService.getUnreadCounts(userId);
+      this.sendToUser(userId, 'notification_count_update', counts);
+    } catch (error) {
+      logger.error('Error updating notification count:', error);
     }
   }
 

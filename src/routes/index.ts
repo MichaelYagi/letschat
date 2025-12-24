@@ -5,6 +5,7 @@ import fileRoutes from './files';
 import connectionRoutes from './connections';
 import reactionRoutes from './reactions';
 import readReceiptRoutes from './readReceipts';
+import notificationRoutes from './notifications';
 
 export const setupRoutes = (): Router => {
   const router = Router();
@@ -21,6 +22,13 @@ export const setupRoutes = (): Router => {
   router.use('/connections', connectionRoutes);
   router.use('/messages', reactionRoutes);
   router.use('/messages', readReceiptRoutes);
+  router.use('/notifications', notificationRoutes);
+
+  // v1 routes for frontend compatibility
+  router.use('/v1/connections', connectionRoutes);
+  router.use('/v1/auth', authRoutes);
+  router.use('/v1/messages', messageRoutes);
+  router.use('/v1/notifications', notificationRoutes);
 
   // Placeholder for future routes
   router.get('/test', (req, res) => {

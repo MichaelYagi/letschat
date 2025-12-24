@@ -1,8 +1,17 @@
 import { useState, useEffect } from 'react';
 import { conversationsApi, usersApi } from '../../services/api';
-import { MessageCircle, Users, Search, X } from 'lucide-react';
+import {
+  MessageCircle,
+  Users,
+  Search,
+  X,
+  Plus,
+  Phone,
+  Video,
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
+import { useCalling } from '../../hooks/useCalling';
 
 interface Conversation {
   id: string;
@@ -31,12 +40,16 @@ export function ConversationList({
   onConversationSelect,
 }: ConversationListProps) {
   const { user } = useAuth();
+  const { startCall } = useCalling();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUserSearch, setShowUserSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [showGroupCreation, setShowGroupCreation] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
   useEffect(() => {
     loadConversations();
@@ -89,6 +102,34 @@ export function ConversationList({
       }
     } catch (error) {
       console.error('Failed to start conversation:', error);
+    }
+  };
+
+  const createGroupChat = async () => {
+    if (!groupName.trim() || selectedUsers.length === 0) {
+      return;
+    }
+
+    try {
+      const response = await conversationsApi.createConversation({
+        type: 'group',
+        name: groupName.trim(),
+        participantIds: selectedUsers,
+      });
+
+      const newConversation = response.conversation;
+      setConversations(prev => [newConversation, ...prev]);
+      setShowGroupCreation(false);
+      setGroupName('');
+      setSelectedUsers([]);
+      setSearchQuery('');
+      setSearchResults([]);
+
+      if (onConversationSelect) {
+        onConversationSelect(newConversation.id);
+      }
+    } catch (error) {
+      console.error('Failed to create group chat:', error);
     }
   };
 
@@ -151,12 +192,22 @@ export function ConversationList({
       <div className='p-4 border-b border-gray-200 bg-white'>
         <div className='flex items-center justify-between'>
           <h2 className='text-lg font-semibold text-gray-900'>Conversations</h2>
-          <button
-            onClick={() => setShowUserSearch(!showUserSearch)}
-            className='p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors'
-          >
-            {showUserSearch ? <X size={20} /> : <Search size={20} />}
-          </button>
+          <div className='flex items-center space-x-2'>
+            <button
+              onClick={() => setShowGroupCreation(!showGroupCreation)}
+              className='p-2 text-green-600 hover:bg-green-50 rounded-full transition-colors'
+              title='Create Group'
+            >
+              <Plus size={20} />
+            </button>
+            <button
+              onClick={() => setShowUserSearch(!showUserSearch)}
+              className='p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors'
+              title='Search Users'
+            >
+              {showUserSearch ? <X size={20} /> : <Search size={20} />}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -218,6 +269,137 @@ export function ConversationList({
               No users found matching "{searchQuery}"
             </div>
           )}
+        </div>
+      )}
+
+      {/* Group Creation */}
+      {showGroupCreation && (
+        <div className='p-4 border-b border-gray-200 bg-gray-50'>
+          <div className='space-y-3'>
+            <div>
+              <label className='block text-sm font-medium text-gray-700 mb-1'>
+                Group Name
+              </label>
+              <input
+                type='text'
+                placeholder='Enter group name...'
+                value={groupName}
+                onChange={e => setGroupName(e.target.value)}
+                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm'
+              />
+            </div>
+
+            <div>
+              <label className='block text-sm font-medium text-gray-700 mb-1'>
+                Search and add users
+              </label>
+              <div className='relative'>
+                <Search
+                  className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400'
+                  size={16}
+                />
+                <input
+                  type='text'
+                  placeholder='Search users to add...'
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className='w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm'
+                />
+              </div>
+            </div>
+
+            {/* Selected Users */}
+            {selectedUsers.length > 0 && (
+              <div className='space-y-2'>
+                <p className='text-xs text-gray-500'>Selected users:</p>
+                <div className='flex flex-wrap gap-2'>
+                  {selectedUsers.map(userId => {
+                    const user = searchResults.find(u => u.id === userId);
+                    return user ? (
+                      <div
+                        key={userId}
+                        className='inline-flex items-center bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs'
+                      >
+                        {user.username}
+                        <button
+                          onClick={() =>
+                            setSelectedUsers(prev =>
+                              prev.filter(id => id !== userId)
+                            )
+                          }
+                          className='ml-1 text-green-600 hover:text-green-800'
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Search Results for Group */}
+            {!searchLoading && searchResults.length > 0 && (
+              <div className='space-y-1 max-h-32 overflow-y-auto'>
+                {searchResults.map(searchUser => (
+                  <div
+                    key={searchUser.id}
+                    onClick={() => {
+                      if (
+                        !selectedUsers.includes(searchUser.id) &&
+                        searchUser.id !== user?.id
+                      ) {
+                        setSelectedUsers(prev => [...prev, searchUser.id]);
+                      }
+                    }}
+                    className={`p-2 bg-white border border-gray-200 rounded-lg cursor-pointer transition-colors ${
+                      selectedUsers.includes(searchUser.id) ||
+                      searchUser.id === user?.id
+                        ? 'opacity-50 cursor-not-allowed'
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className='flex items-center space-x-2'>
+                      <div className='w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-medium'>
+                        {searchUser.username.charAt(0).toUpperCase()}
+                      </div>
+                      <span className='text-sm text-gray-900'>
+                        {searchUser.username}
+                      </span>
+                      {selectedUsers.includes(searchUser.id) && (
+                        <span className='text-xs text-green-600'>Added</span>
+                      )}
+                      {searchUser.id === user?.id && (
+                        <span className='text-xs text-gray-500'>You</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className='flex space-x-2'>
+              <button
+                onClick={createGroupChat}
+                disabled={!groupName.trim() || selectedUsers.length === 0}
+                className='flex-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors text-sm'
+              >
+                Create Group
+              </button>
+              <button
+                onClick={() => {
+                  setShowGroupCreation(false);
+                  setGroupName('');
+                  setSelectedUsers([]);
+                  setSearchQuery('');
+                  setSearchResults([]);
+                }}
+                className='px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm'
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -287,6 +469,42 @@ export function ConversationList({
                           )}
                       </div>
                       <div className='flex items-center space-x-2'>
+                        {/* Calling buttons for direct messages */}
+                        {conversation.type === 'direct' &&
+                          conversation.participant && (
+                            <div className='flex space-x-1'>
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  const username =
+                                    typeof conversation.participant === 'string'
+                                      ? conversation.participant
+                                      : conversation.participant?.username ||
+                                        'Unknown';
+                                  startCall(conversation.id, username, 'voice');
+                                }}
+                                className='p-1 text-green-600 hover:bg-green-50 rounded-full transition-colors'
+                                title='Voice Call'
+                              >
+                                <Phone size={16} />
+                              </button>
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  const username =
+                                    typeof conversation.participant === 'string'
+                                      ? conversation.participant
+                                      : conversation.participant?.username ||
+                                        'Unknown';
+                                  startCall(conversation.id, username, 'video');
+                                }}
+                                className='p-1 text-purple-600 hover:bg-purple-50 rounded-full transition-colors'
+                                title='Video Call'
+                              >
+                                <Video size={16} />
+                              </button>
+                            </div>
+                          )}
                         {conversation.unreadCount > 0 && (
                           <span className='bg-primary-600 text-white text-xs px-2 py-1 rounded-full font-medium'>
                             {conversation.unreadCount}

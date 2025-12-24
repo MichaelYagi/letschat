@@ -113,6 +113,9 @@ router.get('/status', ConnectionController.getConnectionStatus);
  */
 router.post('/accept', ConnectionController.acceptRequest);
 
+// v1 endpoint compatibility
+router.put('/:requestId/accept', ConnectionController.acceptRequest);
+
 /**
  * @swagger
  * /api/connections/decline:
@@ -136,6 +139,9 @@ router.post('/accept', ConnectionController.acceptRequest);
  *         description: Connection request declined
  */
 router.post('/decline', ConnectionController.declineRequest);
+
+// v1 endpoint compatibility
+router.put('/:requestId/reject', ConnectionController.declineRequest);
 
 /**
  * @swagger

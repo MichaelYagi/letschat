@@ -127,7 +127,7 @@ export class UserRepository {
     limit: number = 20
   ): Promise<UserPublic[]> {
     const users = await db('users')
-      .where('username', 'ilike', `%${query.toLowerCase()}%`)
+      .where('username', 'like', `%${query.toLowerCase()}%`)
       .select('id', 'username', 'avatar_url', 'status', 'last_seen')
       .limit(limit);
 

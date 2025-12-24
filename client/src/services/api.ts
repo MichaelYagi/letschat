@@ -240,7 +240,24 @@ export const filesApi = {
 export const notificationsApi = {
   async getNotifications(params?: any): Promise<any> {
     const response = await api.get('/v1/notifications', { params });
-    return response.data.data;
+    return response.data;
+  },
+
+  async getUnreadNotifications(params?: any): Promise<any> {
+    const response = await api.get('/v1/notifications/unread', { params });
+    return response.data;
+  },
+
+  async getNotificationsByType(type: string, params?: any): Promise<any> {
+    const response = await api.get(`/v1/notifications/type/${type}`, {
+      params,
+    });
+    return response.data;
+  },
+
+  async getCounts(): Promise<any> {
+    const response = await api.get('/v1/notifications/counts');
+    return response.data;
   },
 
   async markAsRead(notificationId: string): Promise<void> {
@@ -254,12 +271,34 @@ export const notificationsApi = {
   async deleteNotification(notificationId: string): Promise<void> {
     await api.delete(`/v1/notifications/${notificationId}`);
   },
+
+  async deleteReadNotifications(): Promise<void> {
+    await api.delete('/v1/notifications/clean');
+  },
+
+  // Connection request actions (for convenience)
+  async acceptRequest(connectionId: string): Promise<void> {
+    const response = await api.post('/v1/connections/accept', { connectionId });
+    return response.data;
+  },
+
+  async rejectRequest(connectionId: string): Promise<void> {
+    const response = await api.post('/v1/connections/decline', {
+      connectionId,
+    });
+    return response.data;
+  },
 };
 
 export const connectionsApi = {
   async get(): Promise<any> {
     const response = await api.get('/v1/connections');
-    return response.data.data;
+    return response.data;
+  },
+
+  async getPendingRequests(): Promise<any> {
+    const response = await api.get('/v1/connections/pending');
+    return response.data;
   },
 
   async request(username: string): Promise<any> {

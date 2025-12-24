@@ -72,9 +72,11 @@ export class ConnectionController {
         data: requests,
       });
     } catch (error) {
+      console.error('Error in getPendingRequests:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to get pending requests',
+        details: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
@@ -159,6 +161,8 @@ export class ConnectionController {
     try {
       const userId = req.user?.id;
       const { connectionId } = req.body;
+      const requestId = req.params.requestId;
+      const finalConnectionId = connectionId || requestId;
 
       if (!userId) {
         res.status(401).json({
@@ -168,7 +172,7 @@ export class ConnectionController {
         return;
       }
 
-      if (!connectionId) {
+      if (!finalConnectionId) {
         res.status(400).json({
           success: false,
           error: 'Connection ID is required',
@@ -177,7 +181,7 @@ export class ConnectionController {
       }
 
       const connection = await ConnectionService.acceptRequest(
-        connectionId,
+        finalConnectionId,
         userId
       );
 
@@ -201,6 +205,8 @@ export class ConnectionController {
     try {
       const userId = req.user?.id;
       const { connectionId } = req.body;
+      const requestId = req.params.requestId;
+      const finalConnectionId = connectionId || requestId;
 
       if (!userId) {
         res.status(401).json({
@@ -210,7 +216,7 @@ export class ConnectionController {
         return;
       }
 
-      if (!connectionId) {
+      if (!finalConnectionId) {
         res.status(400).json({
           success: false,
           error: 'Connection ID is required',
@@ -219,7 +225,7 @@ export class ConnectionController {
       }
 
       const connection = await ConnectionService.declineRequest(
-        connectionId,
+        finalConnectionId,
         userId
       );
 

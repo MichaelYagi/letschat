@@ -1,10 +1,10 @@
 import db from '../connection';
-import { 
+import {
   UserConnection,
   CreateConnectionRequest,
   ConnectionRequestResponse,
   UserConnectionWithProfile,
-  ConnectionStatus
+  ConnectionStatus,
 } from '../../types/Connection';
 import { EncryptionService } from '../../utils/encryption';
 
@@ -17,14 +17,17 @@ export class ConnectionRepository {
     addresseeId: string
   ): Promise<UserConnection> {
     const connectionId = EncryptionService.generateUUID();
-    
+
     // Check if connection already exists
-    const existingConnection = await this.findExistingConnection(requesterId, addresseeId);
-    
+    const existingConnection = await this.findExistingConnection(
+      requesterId,
+      addresseeId
+    );
+
     if (existingConnection) {
       throw new Error('Connection request already exists');
     }
-    
+
     const [connection] = await db('user_connections')
       .insert({
         id: connectionId,
@@ -35,10 +38,10 @@ export class ConnectionRepository {
         updated_at: new Date(),
       })
       .returning('*');
-    
+
     return this.mapDbConnectionToConnection(connection);
   }
-  
+
   /**
    * Find existing connection between two users
    */
@@ -47,7 +50,7 @@ export class ConnectionRepository {
     user2Id: string
   ): Promise<UserConnection | null> {
     const connection = await db('user_connections')
-      .where((builder) => {
+      .where(builder => {
         builder
           .where('requester_id', user1Id)
           .andWhere('addressee_id', user2Id)
@@ -55,42 +58,60 @@ export class ConnectionRepository {
           .andWhere('addressee_id', user1Id);
       })
       .first();
-    
+
     return connection ? this.mapDbConnectionToConnection(connection) : null;
   }
-  
+
   /**
    * Get pending requests for user
    */
-  static async getPendingRequests(userId: string): Promise<UserConnectionWithProfile[]> {
+  static async getPendingRequests(
+    userId: string
+  ): Promise<UserConnectionWithProfile[]> {
     const requests = await db('user_connections')
-      .join('users as requester', 'user_connections.requester_id', 'requester.id')
-      .join('users as addressee', 'user_connections.addressee_id', 'addressee.id')
+      .join(
+        'users as requester',
+        'user_connections.requester_id',
+        'requester.id'
+      )
+      .join(
+        'users as addressee',
+        'user_connections.addressee_id',
+        'addressee.id'
+      )
       .where('user_connections.addressee_id', userId)
       .where('user_connections.status', 'pending')
       .select([
         'user_connections.*',
         'requester.username as requester_username',
-        'requester.display_name as requester_display_name',
         'requester.avatar_url as requester_avatar_url',
         'requester.status as requester_status',
         'addressee.username as addressee_username',
-        'addressee.display_name as addressee_display_name',
         'addressee.avatar_url as addressee_avatar_url',
         'addressee.status as addressee_status',
       ]);
-    
+
     return requests.map(this.mapDbConnectionWithProfiles);
   }
-  
+
   /**
    * Get user's connections
    */
-  static async getUserConnections(userId: string): Promise<UserConnectionWithProfile[]> {
+  static async getUserConnections(
+    userId: string
+  ): Promise<UserConnectionWithProfile[]> {
     const connections = await db('user_connections')
-      .join('users as requester', 'user_connections.requester_id', 'requester.id')
-      .join('users as addressee', 'user_connections.addressee_id', 'addressee.id')
-      .where((builder) => {
+      .join(
+        'users as requester',
+        'user_connections.requester_id',
+        'requester.id'
+      )
+      .join(
+        'users as addressee',
+        'user_connections.addressee_id',
+        'addressee.id'
+      )
+      .where(builder => {
         builder
           .where('user_connections.requester_id', userId)
           .orWhere('user_connections.addressee_id', userId);
@@ -99,19 +120,19 @@ export class ConnectionRepository {
       .select([
         'user_connections.*',
         'requester.username as requester_username',
-        'requester.display_name as requester_display_name',
+
         'requester.avatar_url as requester_avatar_url',
         'requester.status as requester_status',
         'addressee.username as addressee_username',
-        'addressee.display_name as addressee_display_name',
+
         'addressee.avatar_url as addressee_avatar_url',
         'addressee.status as addressee_status',
       ])
       .orderBy('user_connections.updated_at', 'desc');
-    
+
     return connections.map(this.mapDbConnectionWithProfiles);
   }
-  
+
   /**
    * Get connection status between two users
    */
@@ -120,20 +141,20 @@ export class ConnectionRepository {
     user2Id: string
   ): Promise<ConnectionStatus> {
     const connection = await this.findExistingConnection(user1Id, user2Id);
-    
+
     if (!connection) {
       return { isConnected: false, initiatedBy: 'me' };
     }
-    
+
     const initiatedBy = connection.requesterId === user1Id ? 'me' : 'them';
-    
+
     return {
       isConnected: connection.status === 'accepted',
       status: connection.status,
       initiatedBy,
     };
   }
-  
+
   /**
    * Respond to connection request
    */
@@ -147,15 +168,15 @@ export class ConnectionRepository {
       .where('id', connectionId)
       .where('addressee_id', userId)
       .first();
-    
+
     if (!connection) {
       throw new Error('Connection request not found');
     }
-    
+
     if (connection.status !== 'pending') {
       throw new Error('Connection request already processed');
     }
-    
+
     const [updatedConnection] = await db('user_connections')
       .where('id', connectionId)
       .where('addressee_id', userId)
@@ -164,12 +185,12 @@ export class ConnectionRepository {
         updated_at: new Date(),
       })
       .returning('*');
-    
-    return updatedConnection 
+
+    return updatedConnection
       ? this.mapDbConnectionToConnection(updatedConnection)
       : null;
   }
-  
+
   /**
    * Remove connection
    */
@@ -180,24 +201,22 @@ export class ConnectionRepository {
     // Verify user is part of the connection
     const connection = await db('user_connections')
       .where('id', connectionId)
-      .where((builder) => {
-        builder
-          .where('requester_id', userId)
-          .orWhere('addressee_id', userId);
+      .where(builder => {
+        builder.where('requester_id', userId).orWhere('addressee_id', userId);
       })
       .first();
-    
+
     if (!connection) {
       throw new Error('Connection not found');
     }
-    
+
     const deletedCount = await db('user_connections')
       .where('id', connectionId)
       .del();
-    
+
     return deletedCount > 0;
   }
-  
+
   /**
    * Block user
    */
@@ -206,8 +225,11 @@ export class ConnectionRepository {
     addresseeId: string
   ): Promise<UserConnection> {
     // Check if connection exists
-    const existingConnection = await this.findExistingConnection(requesterId, addresseeId);
-    
+    const existingConnection = await this.findExistingConnection(
+      requesterId,
+      addresseeId
+    );
+
     if (existingConnection) {
       // Update existing connection to blocked
       const [updatedConnection] = await db('user_connections')
@@ -217,14 +239,14 @@ export class ConnectionRepository {
           updated_at: new Date(),
         })
         .returning('*');
-      
+
       return this.mapDbConnectionToConnection(updatedConnection);
     } else {
       // Create new blocked connection
       return await this.createRequest(requesterId, addresseeId);
     }
   }
-  
+
   /**
    * Unblock user
    */
@@ -237,38 +259,50 @@ export class ConnectionRepository {
       .where('addressee_id', addresseeId)
       .where('status', 'blocked')
       .del();
-    
+
     return deletedCount > 0;
   }
-  
+
   /**
    * Get blocked users
    */
-  static async getBlockedUsers(userId: string): Promise<UserConnectionWithProfile[]> {
+  static async getBlockedUsers(
+    userId: string
+  ): Promise<UserConnectionWithProfile[]> {
     const blocked = await db('user_connections')
-      .join('users as requester', 'user_connections.requester_id', 'requester.id')
-      .join('users as addressee', 'user_connections.addressee_id', 'addressee.id')
+      .join(
+        'users as requester',
+        'user_connections.requester_id',
+        'requester.id'
+      )
+      .join(
+        'users as addressee',
+        'user_connections.addressee_id',
+        'addressee.id'
+      )
       .where('user_connections.requester_id', userId)
       .where('user_connections.status', 'blocked')
       .select([
         'user_connections.*',
         'requester.username as requester_username',
-        'requester.display_name as requester_display_name',
+
         'requester.avatar_url as requester_avatar_url',
         'requester.status as requester_status',
         'addressee.username as addressee_username',
-        'addressee.display_name as addressee_display_name',
+
         'addressee.avatar_url as addressee_avatar_url',
         'addressee.status as addressee_status',
       ]);
-    
+
     return blocked.map(this.mapDbConnectionWithProfiles);
   }
-  
+
   /**
    * Map database connection to UserConnection model
    */
-  private static mapDbConnectionToConnection(dbConnection: any): UserConnection {
+  private static mapDbConnectionToConnection(
+    dbConnection: any
+  ): UserConnection {
     return {
       id: dbConnection.id,
       requesterId: dbConnection.requester_id,
@@ -278,11 +312,13 @@ export class ConnectionRepository {
       updatedAt: new Date(dbConnection.updated_at),
     };
   }
-  
+
   /**
    * Map database connection with user profiles
    */
-  private static mapDbConnectionWithProfiles(dbConnection: any): UserConnectionWithProfile {
+  private static mapDbConnectionWithProfiles(
+    dbConnection: any
+  ): UserConnectionWithProfile {
     return {
       id: dbConnection.id,
       requesterId: dbConnection.requester_id,
@@ -293,14 +329,14 @@ export class ConnectionRepository {
       requesterProfile: {
         id: dbConnection.requester_id,
         username: dbConnection.requester_username,
-        displayName: dbConnection.requester_display_name,
+        displayName: dbConnection.requester_username, // Use username as display_name
         avatarUrl: dbConnection.requester_avatar_url,
         status: dbConnection.requester_status,
       },
       addresseeProfile: {
         id: dbConnection.addressee_id,
         username: dbConnection.addressee_username,
-        displayName: dbConnection.addressee_display_name,
+        displayName: dbConnection.addressee_username, // Use username as display_name
         avatarUrl: dbConnection.addressee_avatar_url,
         status: dbConnection.addressee_status,
       },

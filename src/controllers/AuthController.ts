@@ -229,9 +229,10 @@ export class AuthController {
         data: users,
       });
     } catch (error) {
+      console.error('Search error:', error);
       res.status(500).json({
         success: false,
-        error: 'Search failed',
+        error: error instanceof Error ? error.message : 'Search failed',
       });
     }
   }

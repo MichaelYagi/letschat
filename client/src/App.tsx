@@ -11,9 +11,11 @@ import { MessageCircle } from 'lucide-react';
 import { ChatPage } from './components/chat/ChatPage';
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
-import { ConversationList } from './components/chat/ConversationList';
 import { UserProfile } from './components/UserProfile';
 import { NotificationSettings } from './components/NotificationSettings';
+import { MainLayout } from './components/layout/MainLayout';
+import { ConversationListWrapper } from './components/wrappers/ConversationListWrapper';
+import { Connections } from './components/connections/Connections';
 import { RegistrationDebug } from './components/debug/RegistrationDebug';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
@@ -44,19 +46,22 @@ function AppContent() {
     <Router>
       <div className='min-h-screen bg-gray-50'>
         {user ? (
-          <Routes>
-            <Route path='/' element={<ConversationList />} />
-            <Route path='/chat/:conversationId' element={<ChatPage />} />
-            <Route
-              path='/profile'
-              element={<UserProfile onClose={() => {}} />}
-            />
-            <Route
-              path='/settings'
-              element={<NotificationSettings onClose={() => {}} />}
-            />
-            <Route path='*' element={<Navigate to='/' replace />} />
-          </Routes>
+          <MainLayout>
+            <Routes>
+              <Route path='/' element={<ConversationListWrapper />} />
+              <Route path='/chat/:conversationId' element={<ChatPage />} />
+              <Route path='/friends' element={<Connections />} />
+              <Route
+                path='/profile'
+                element={<UserProfile onClose={() => {}} />}
+              />
+              <Route
+                path='/settings'
+                element={<NotificationSettings onClose={() => {}} />}
+              />
+              <Route path='*' element={<Navigate to='/' replace />} />
+            </Routes>
+          </MainLayout>
         ) : (
           <Routes>
             <Route path='/login' element={<LoginForm />} />

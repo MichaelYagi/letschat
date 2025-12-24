@@ -1,11 +1,12 @@
 import { ConnectionRepository } from '../database/repositories/ConnectionRepository';
 import { UserRepository } from '../database/repositories/UserRepository';
-import { 
+import { NotificationService } from './NotificationService';
+import {
   UserConnection,
   CreateConnectionRequest,
   ConnectionRequestResponse,
   UserConnectionWithProfile,
-  ConnectionStatus
+  ConnectionStatus,
 } from '../types/Connection';
 
 export class ConnectionService {
@@ -17,42 +18,58 @@ export class ConnectionService {
     requestData: CreateConnectionRequest
   ): Promise<UserConnection> {
     // Find target user
-    const targetUser = await UserRepository.findByUsername(requestData.username);
-    
+    const targetUser = await UserRepository.findByUsername(
+      requestData.username
+    );
+
     if (!targetUser) {
       throw new Error('User not found');
     }
-    
+
     if (targetUser.id === requesterId) {
       throw new Error('Cannot send connection request to yourself');
     }
-    
+
+    // Get requester info for notification
+    const requester = await UserRepository.findById(requesterId);
+    if (!requester) {
+      throw new Error('Requester not found');
+    }
+
     // Create connection request
     const connection = await ConnectionRepository.createRequest(
       requesterId,
       targetUser.id
     );
-    
-    // Real-time notification would be handled by WebSocket service
-    // For now, connection request is created successfully
-    
+
+    // Create notification for the recipient
+    await NotificationService.createConnectionRequestNotification(
+      targetUser.id,
+      requester.username,
+      connection.id
+    );
+
     return connection;
   }
-  
+
   /**
    * Get pending connection requests
    */
-  static async getPendingRequests(userId: string): Promise<UserConnectionWithProfile[]> {
+  static async getPendingRequests(
+    userId: string
+  ): Promise<UserConnectionWithProfile[]> {
     return await ConnectionRepository.getPendingRequests(userId);
   }
-  
+
   /**
    * Get user's connections
    */
-  static async getConnections(userId: string): Promise<UserConnectionWithProfile[]> {
+  static async getConnections(
+    userId: string
+  ): Promise<UserConnectionWithProfile[]> {
     return await ConnectionRepository.getUserConnections(userId);
   }
-  
+
   /**
    * Get connection status with another user
    */
@@ -61,14 +78,14 @@ export class ConnectionService {
     otherUsername: string
   ): Promise<ConnectionStatus> {
     const otherUser = await UserRepository.findByUsername(otherUsername);
-    
+
     if (!otherUser) {
       throw new Error('User not found');
     }
-    
+
     return await ConnectionRepository.getConnectionStatus(userId, otherUser.id);
   }
-  
+
   /**
    * Accept connection request
    */
@@ -81,17 +98,26 @@ export class ConnectionService {
       userId,
       { connectionId, status: 'accepted' }
     );
-    
+
     if (!connection) {
       throw new Error('Connection request not found');
     }
-    
-    // Real-time notification would be handled by WebSocket service
-    // For now, connection is accepted successfully
-    
+
+    // Get user info for notification
+    const user = await UserRepository.findById(userId);
+    const requester = await UserRepository.findById(connection.requesterId);
+
+    if (user && requester) {
+      // Create notification for the original requester
+      await NotificationService.createConnectionAcceptedNotification(
+        connection.requesterId,
+        user.username
+      );
+    }
+
     return connection;
   }
-  
+
   /**
    * Decline connection request
    */
@@ -104,105 +130,140 @@ export class ConnectionService {
       userId,
       { connectionId, status: 'declined' }
     );
-    
+
     if (!connection) {
       throw new Error('Connection request not found');
     }
-    
-    // Real-time notification would be handled by WebSocket service
-    // For now, connection is declined successfully
-    
+
+    // Get user info for notification
+    const user = await UserRepository.findById(userId);
+    const requester = await UserRepository.findById(connection.requesterId);
+
+    if (user && requester) {
+      // Create notification for the original requester
+      await NotificationService.createConnectionDeclinedNotification(
+        connection.requesterId,
+        user.username
+      );
+    }
+
     return connection;
   }
-  
+
   /**
    * Remove connection
    */
-  static async removeConnection(connectionId: string, userId: string): Promise<void> {
+  static async removeConnection(
+    connectionId: string,
+    userId: string
+  ): Promise<void> {
     // Get connection details before removal for notification
     const connections = await ConnectionRepository.getUserConnections(userId);
     const connection = connections.find(c => c.id === connectionId);
-    
+
     if (!connection) {
       throw new Error('Connection not found');
     }
-    
-    const otherUserId = connection.requesterId === userId 
-      ? connection.addresseeId 
-      : connection.requesterId;
-    
+
+    const otherUserId =
+      connection.requesterId === userId
+        ? connection.addresseeId
+        : connection.requesterId;
+
     // Remove connection
-    const removed = await ConnectionRepository.removeConnection(connectionId, userId);
-    
+    const removed = await ConnectionRepository.removeConnection(
+      connectionId,
+      userId
+    );
+
     if (removed) {
       // Real-time notification would be handled by WebSocket service
       // For now, connection is removed successfully
     }
   }
-  
+
   /**
    * Block user
    */
-  static async blockUser(userId: string, username: string): Promise<UserConnection> {
+  static async blockUser(
+    userId: string,
+    username: string
+  ): Promise<UserConnection> {
     const targetUser = await UserRepository.findByUsername(username);
-    
+
     if (!targetUser) {
       throw new Error('User not found');
     }
-    
+
     if (targetUser.id === userId) {
       throw new Error('Cannot block yourself');
     }
-    
-    const connection = await ConnectionRepository.blockUser(userId, targetUser.id);
-    
+
+    const connection = await ConnectionRepository.blockUser(
+      userId,
+      targetUser.id
+    );
+
     // Real-time notification would be handled by WebSocket service
     // For now, user is blocked successfully
-    
+
     return connection;
   }
-  
+
   /**
    * Unblock user
    */
   static async unblockUser(userId: string, username: string): Promise<boolean> {
     const targetUser = await UserRepository.findByUsername(username);
-    
+
     if (!targetUser) {
       throw new Error('User not found');
     }
-    
-    const unblocked = await ConnectionRepository.unblockUser(userId, targetUser.id);
-    
+
+    const unblocked = await ConnectionRepository.unblockUser(
+      userId,
+      targetUser.id
+    );
+
     if (unblocked) {
       // Real-time notification would be handled by WebSocket service
       // For now, user is unblocked successfully
     }
-    
+
     return unblocked;
   }
-  
+
   /**
    * Get blocked users
    */
-  static async getBlockedUsers(userId: string): Promise<UserConnectionWithProfile[]> {
+  static async getBlockedUsers(
+    userId: string
+  ): Promise<UserConnectionWithProfile[]> {
     return await ConnectionRepository.getBlockedUsers(userId);
   }
-  
+
   /**
    * Search for users to connect with
    */
-  static async searchUsers(query: string, userId: string, limit: number = 20): Promise<any[]> {
+  static async searchUsers(
+    query: string,
+    userId: string,
+    limit: number = 20
+  ): Promise<any[]> {
     // Get all users matching query except current user
     const allUsers = await UserRepository.searchUsers(query, limit * 2);
-    
+
     // Get user's current connections to filter them out
     const connections = await this.getConnections(userId);
     const connectedUserIds = new Set([
-      ...connections.map(c => c.requesterId === userId ? c.addresseeId : c.requesterId),
-      ...connections.map(c => c.addresseeId === userId ? c.requesterId : c.addresseeId),
+      ...connections.map(c =>
+        c.requesterId === userId ? c.addresseeId : c.requesterId
+      ),
+      ...connections.map(c =>
+        c.addresseeId === userId ? c.requesterId : c.addresseeId
+      ),
     ]);
-    
+
     // Filter out already connected users and add connection status
     const usersWithStatus = allUsers
       .filter(user => user.id !== userId && !connectedUserIds.has(user.id))
@@ -211,7 +272,7 @@ export class ConnectionService {
         ...user,
         connectionStatus: 'not_connected',
       }));
-    
+
     return usersWithStatus;
   }
 }
