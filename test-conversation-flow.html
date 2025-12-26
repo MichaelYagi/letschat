@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Conversation Flow Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .test {
+        background: #f5f5f5;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 5px;
+      }
+      .success {
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+      }
+      .error {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      pre {
+        background: #f8f9fa;
+        padding: 10px;
+        overflow-x: auto;
+      }
+      .log {
+        height: 300px;
+        overflow-y: scroll;
+        border: 1px solid #ddd;
+        padding: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🧪 Conversation Flow Test</h1>
+
+    <div class="test">
+      <h3>1. Authentication</h3>
+      <button onclick="testLogin()">Test Login</button>
+      <div id="loginResult"></div>
+    </div>
+
+    <div class="test">
+      <h3>2. Get Conversations</h3>
+      <button onclick="testGetConversations()">Get Conversations</button>
+      <div id="conversationsResult"></div>
+    </div>
+
+    <div class="test">
+      <h3>3. Create Conversation</h3>
+      <button onclick="testCreateConversation()">
+        Create New Conversation
+      </button>
+      <div id="createResult"></div>
+    </div>
+
+    <div class="test">
+      <h3>4. Get Messages</h3>
+      <button onclick="testGetMessages()">Get Messages (Conv 1)</button>
+      <div id="messagesResult"></div>
+    </div>
+
+    <div class="test">
+      <h3>5. Send Message</h3>
+      <button onclick="testSendMessage()">Send Message (Conv 1)</button>
+      <div id="sendResult"></div>
+    </div>
+
+    <div class="test">
+      <h3>6. WebSocket Test</h3>
+      <button onclick="testWebSocket()">Test WebSocket</button>
+      <div id="wsResult"></div>
+    </div>
+
+    <div class="test">
+      <h3>Test Log</h3>
+      <div id="testLog" class="log"></div>
+    </div>
+
+    <script>
+      let authToken = '';
+      let socket = null;
+
+      function log(message, type = 'info') {
+        const log = document.getElementById('testLog');
+        const timestamp = new Date().toLocaleTimeString();
+        const className =
+          type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+        log.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+        log.scrollTop = log.scrollHeight;
+      }
+
+      function result(elementId, content, isSuccess = true) {
+        const element = document.getElementById(elementId);
+        const className = isSuccess ? 'success' : 'error';
+        element.innerHTML = `<div class="${className}">${content}</div>`;
+      }
+
+      async function testLogin() {
+        try {
+          log('Testing login...');
+          const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: 'alice',
+              password: 'password123',
+            }),
+          });
+          const data = await response.json();
+
+          if (data.success) {
+            authToken = data.data.token;
+            log('Login successful! Token received', 'success');
+            result(
+              'loginResult',
+              `✅ Logged in as ${data.data.user.username}`,
+              true
+            );
+          } else {
+            log('Login failed: ' + data.error, 'error');
+            result('loginResult', `❌ ${data.error}`, false);
+          }
+        } catch (error) {
+          log('Login error: ' + error.message, 'error');
+          result('loginResult', `❌ ${error.message}`, false);
+        }
+      }
+
+      async function testGetConversations() {
+        try {
+          if (!authToken) {
+            result('conversationsResult', '❌ Please login first', false);
+            return;
+          }
+
+          log('Getting conversations...');
+          const response = await fetch('/api/messages/conversations', {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+          const data = await response.json();
+
+          if (data.success) {
+            log(`Found ${data.data.length} conversations`, 'success');
+            result(
+              'conversationsResult',
+              `✅ Found ${data.data.length} conversations`,
+              true
+            );
+          } else {
+            log('Get conversations failed: ' + data.error, 'error');
+            result('conversationsResult', `❌ ${data.error}`, false);
+          }
+        } catch (error) {
+          log('Get conversations error: ' + error.message, 'error');
+          result('conversationsResult', `❌ ${error.message}`, false);
+        }
+      }
+
+      async function testCreateConversation() {
+        try {
+          if (!authToken) {
+            result('createResult', '❌ Please login first', false);
+            return;
+          }
+
+          log('Creating conversation...');
+          const response = await fetch('/api/messages/conversations', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              type: 'direct',
+              participantIds: ['2'],
+            }),
+          });
+          const data = await response.json();
+
+          if (data.success) {
+            log('Conversation created successfully!', 'success');
+            result(
+              'createResult',
+              `✅ Conversation created: ${data.data.id}`,
+              true
+            );
+          } else {
+            log('Create conversation failed: ' + data.error, 'error');
+            result('createResult', `❌ ${data.error}`, false);
+          }
+        } catch (error) {
+          log('Create conversation error: ' + error.message, 'error');
+          result('createResult', `❌ ${error.message}`, false);
+        }
+      }
+
+      async function testGetMessages() {
+        try {
+          if (!authToken) {
+            result('messagesResult', '❌ Please login first', false);
+            return;
+          }
+
+          log('Getting messages from conversation 1...');
+          const response = await fetch('/v1/conversations/1/messages', {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+          const data = await response.json();
+
+          if (data.success) {
+            log(`Found ${data.data.length} messages`, 'success');
+            result(
+              'messagesResult',
+              `✅ Found ${data.data.length} messages`,
+              true
+            );
+          } else {
+            log('Get messages failed: ' + data.error, 'error');
+            result('messagesResult', `❌ ${data.error}`, false);
+          }
+        } catch (error) {
+          log('Get messages error: ' + error.message, 'error');
+          result('messagesResult', `❌ ${error.message}`, false);
+        }
+      }
+
+      async function testSendMessage() {
+        try {
+          if (!authToken) {
+            result('sendResult', '❌ Please login first', false);
+            return;
+          }
+
+          log('Sending message to conversation 1...');
+          const response = await fetch('/v1/conversations/1/messages', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              content: 'Test message from web UI',
+            }),
+          });
+          const data = await response.json();
+
+          if (data.success) {
+            log('Message sent successfully!', 'success');
+            result('sendResult', `✅ Message sent: ${data.data.content}`, true);
+          } else {
+            log('Send message failed: ' + data.error, 'error');
+            result('sendResult', `❌ ${data.error}`, false);
+          }
+        } catch (error) {
+          log('Send message error: ' + error.message, 'error');
+          result('sendResult', `❌ ${error.message}`, false);
+        }
+      }
+
+      function testWebSocket() {
+        try {
+          log('Testing WebSocket connection...');
+
+          if (socket) {
+            socket.close();
+          }
+
+          socket = new WebSocket('ws://localhost:3000');
+
+          socket.onopen = function () {
+            log('WebSocket connected!', 'success');
+            result('wsResult', '✅ WebSocket connected', true);
+
+            // Join conversation 1
+            socket.send(
+              JSON.stringify({
+                type: 'join_conversation',
+                data: { conversationId: '1' },
+              })
+            );
+          };
+
+          socket.onmessage = function (event) {
+            const message = JSON.parse(event.data);
+            log('WebSocket message received: ' + JSON.stringify(message));
+
+            if (message.type === 'new_message') {
+              result(
+                'wsResult',
+                `✅ Real-time message: ${message.data.content}`,
+                true
+              );
+            }
+          };
+
+          socket.onerror = function (error) {
+            log('WebSocket error: ' + error, 'error');
+            result('wsResult', '❌ WebSocket error', false);
+          };
+
+          socket.onclose = function () {
+            log('WebSocket closed');
+          };
+        } catch (error) {
+          log('WebSocket test error: ' + error.message, 'error');
+          result('wsResult', `❌ ${error.message}`, false);
+        }
+      }
+
+      // Auto-run login when page loads
+      window.onload = function () {
+        log('Conversation flow test page loaded. Ready for testing!');
+      };
+    </script>
+  </body>
+</html>

@@ -56,7 +56,9 @@ export function MessageBubble({
       {!isOwn && showAvatar && (
         <div className='flex-shrink-0 mr-3'>
           <div className='w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm font-medium hover-lift'>
-            {message.sender.displayName?.[0] || message.sender.username[0]}
+            {message.sender?.displayName?.[0] ||
+              message.sender?.username?.[0] ||
+              '?'}
           </div>
         </div>
       )}
@@ -76,7 +78,7 @@ export function MessageBubble({
               }`}
             >
               <div className='font-medium'>
-                {message.replyTo.sender.username}
+                {message.replyTo?.sender?.username || 'Unknown'}
               </div>
               <div className='truncate'>{message.replyTo.content}</div>
             </div>
@@ -142,7 +144,9 @@ export function MessageBubble({
         >
           {!isOwn && showAvatar && (
             <span className='font-medium text-gray-600 mr-2'>
-              {message.sender.displayName || message.sender.username}
+              {message.sender?.displayName ||
+                message.sender?.username ||
+                'Unknown'}
             </span>
           )}
 
@@ -230,7 +234,9 @@ export function MessageBubble({
       {isOwn && showAvatar && (
         <div className='flex-shrink-0 ml-3 order-3'>
           <div className='w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white text-sm font-medium'>
-            {message.sender.displayName?.[0] || message.sender.username[0]}
+            {message.sender?.displayName?.[0] ||
+              message.sender?.username?.[0] ||
+              '?'}
           </div>
         </div>
       )}

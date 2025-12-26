@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Frontend Chat Test</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .login-section {
+        margin-bottom: 20px;
+        padding: 20px;
+        border: 1px solid #ccc;
+      }
+      .chat-section {
+        display: none;
+      }
+      .messages {
+        height: 300px;
+        overflow-y: auto;
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+      .message {
+        margin-bottom: 10px;
+        padding: 5px;
+      }
+      .message.own {
+        background-color: #e0f7fa;
+      }
+      .message.other {
+        background-color: #f5f5f5;
+      }
+      .input-area {
+        display: flex;
+        gap: 10px;
+      }
+      .input-area input {
+        flex: 1;
+        padding: 5px;
+      }
+      .input-area button {
+        padding: 5px 10px;
+      }
+      .status {
+        margin-bottom: 10px;
+        padding: 10px;
+        background-color: #f0f0f0;
+      }
+      .online {
+        color: green;
+      }
+      .offline {
+        color: red;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Frontend Chat Test</h1>
+
+      <div class="login-section">
+        <h2>Login</h2>
+        <div>
+          <label>Username: </label>
+          <select id="username">
+            <option value="alice">Alice</option>
+            <option value="bob">Bob</option>
+            <option value="charlie">Charlie</option>
+          </select>
+        </div>
+        <div style="margin-top: 10px">
+          <label>Password: </label>
+          <input type="password" id="password" value="password123" />
+        </div>
+        <button onclick="login()" style="margin-top: 10px">Login</button>
+      </div>
+
+      <div class="chat-section">
+        <div class="status">
+          Connection Status:
+          <span id="connection-status" class="offline">Offline</span> | User:
+          <span id="current-user"></span> | Conversation:
+          <span id="conversation-info"></span>
+        </div>
+
+        <div class="messages" id="messages"></div>
+
+        <div class="input-area">
+          <input
+            type="text"
+            id="message-input"
+            placeholder="Type a message..."
+            onkeypress="handleKeyPress(event)"
+          />
+          <button onclick="sendMessage()">Send</button>
+        </div>
+
+        <div style="margin-top: 10px">
+          <button onclick="loadMessages()">Load Messages</button>
+          <button onclick="testWebSocket()">Test WebSocket</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let socket = null;
+      let token = null;
+      let currentUser = null;
+      let conversationId = null;
+
+      async function login() {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        try {
+          const response = await fetch('http://localhost:3000/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, password }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            token = data.data.token;
+            currentUser = data.data.user;
+
+            document.querySelector('.login-section').style.display = 'none';
+            document.querySelector('.chat-section').style.display = 'block';
+            document.getElementById('current-user').textContent =
+              currentUser.displayName;
+
+            connectWebSocket();
+            loadConversations();
+          } else {
+            alert('Login failed: ' + data.error);
+          }
+        } catch (error) {
+          console.error('Login error:', error);
+          alert('Login failed: ' + error.message);
+        }
+      }
+
+      function connectWebSocket() {
+        socket = io('http://localhost:3000', {
+          auth: {
+            token: token,
+          },
+        });
+
+        socket.on('connect', () => {
+          document.getElementById('connection-status').textContent = 'Online';
+          document.getElementById('connection-status').className = 'online';
+          console.log('Connected to WebSocket');
+        });
+
+        socket.on('disconnect', () => {
+          document.getElementById('connection-status').textContent = 'Offline';
+          document.getElementById('connection-status').className = 'offline';
+          console.log('Disconnected from WebSocket');
+        });
+
+        socket.on('new_message', message => {
+          addMessage(message);
+          console.log('New message received:', message);
+        });
+
+        socket.on('joined_conversation', data => {
+          console.log('Joined conversation:', data);
+        });
+
+        socket.on('error', error => {
+          console.error('Socket error:', error);
+          alert('Socket error: ' + error.message);
+        });
+      }
+
+      async function loadConversations() {
+        try {
+          const response = await fetch(
+            'http://localhost:3000/api/messages/conversations',
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          const data = await response.json();
+
+          if (data.success && data.data.length > 0) {
+            conversationId = data.data[0].id;
+            document.getElementById('conversation-info').textContent =
+              data.data[0].name || conversationId;
+
+            // Join conversation
+            socket.emit('join_conversation', { conversationId });
+
+            // Load messages
+            loadMessages();
+          } else {
+            alert('No conversations found');
+          }
+        } catch (error) {
+          console.error('Load conversations error:', error);
+          alert('Failed to load conversations: ' + error.message);
+        }
+      }
+
+      async function loadMessages() {
+        if (!conversationId) return;
+
+        try {
+          const response = await fetch(
+            `http://localhost:3000/api/messages/conversations/${conversationId}/messages`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          const data = await response.json();
+
+          if (data.success) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '';
+
+            data.data.forEach(message => {
+              addMessage(message);
+            });
+          } else {
+            alert('Failed to load messages: ' + data.error);
+          }
+        } catch (error) {
+          console.error('Load messages error:', error);
+          alert('Failed to load messages: ' + error.message);
+        }
+      }
+
+      function sendMessage() {
+        const input = document.getElementById('message-input');
+        const content = input.value.trim();
+
+        if (!content || !conversationId) return;
+
+        socket.emit('send_message', {
+          conversationId: conversationId,
+          content: content,
+        });
+
+        input.value = '';
+      }
+
+      function addMessage(message) {
+        const messagesDiv = document.getElementById('messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${message.senderId === currentUser.id ? 'own' : 'other'}`;
+
+        const timestamp = new Date(message.createdAt).toLocaleTimeString();
+        const senderName = message.sender
+          ? message.sender.displayName || message.sender.username
+          : 'Unknown';
+
+        messageDiv.innerHTML = `
+                <strong>${senderName}:</strong> ${message.content}
+                <small>(${timestamp})</small>
+            `;
+
+        messagesDiv.appendChild(messageDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+
+      function testWebSocket() {
+        if (socket) {
+          console.log('Socket connected:', socket.connected);
+          console.log('Socket ID:', socket.id);
+          console.log('Current user:', currentUser);
+          console.log('Conversation ID:', conversationId);
+        } else {
+          console.log('No socket connection');
+        }
+      }
+
+      function handleKeyPress(event) {
+        if (event.key === 'Enter') {
+          sendMessage();
+        }
+      }
+
+      // Auto-login as Alice for testing
+      window.onload = function () {
+        setTimeout(() => {
+          document.getElementById('username').value = 'alice';
+          login();
+        }, 500);
+      };
+    </script>
+  </body>
+</html>

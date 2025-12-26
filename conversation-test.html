@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Conversation Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+      }
+      .user-section {
+        background: #f0f8ff;
+      }
+      .conversation-section {
+        background: #f8f0ff;
+      }
+      .message-section {
+        background: #fff0f0;
+      }
+      .status {
+        padding: 5px 10px;
+        margin: 5px 0;
+        border-radius: 3px;
+      }
+      .success {
+        background: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .info {
+        background: #d1ecf1;
+        color: #0c5460;
+      }
+      .messages {
+        height: 200px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        padding: 10px;
+        margin: 10px 0;
+      }
+      .message {
+        margin: 5px 0;
+        padding: 5px;
+        border-radius: 5px;
+      }
+      .own {
+        background: #dcf8c6;
+        text-align: right;
+      }
+      .other {
+        background: #e8e8e8;
+      }
+      button {
+        padding: 8px 16px;
+        margin: 5px;
+      }
+      input,
+      select {
+        padding: 5px;
+        margin: 5px;
+      }
+      .conversation-list {
+        max-height: 150px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+      }
+      .conversation-item {
+        padding: 8px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+      }
+      .conversation-item:hover {
+        background: #f0f0f0;
+      }
+      .conversation-item.active {
+        background: #007bff;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Conversation Functionality Test</h1>
+
+      <!-- User Login Section -->
+      <div class="section user-section">
+        <h2>User Login</h2>
+        <div>
+          <select id="userSelect">
+            <option value="">Select Test User</option>
+            <option value="testuser1">testuser1</option>
+            <option value="testuser2">testuser2</option>
+          </select>
+          <input
+            type="password"
+            id="passwordInput"
+            value="password123"
+            placeholder="Password"
+          />
+          <button onclick="login()">Login</button>
+        </div>
+        <div id="loginStatus" class="status info">
+          Please select a user and login
+        </div>
+        <div id="userInfo"></div>
+      </div>
+
+      <!-- Conversation Management -->
+      <div class="section conversation-section">
+        <h2>Conversations</h2>
+        <div>
+          <button onclick="loadConversations()">Load Conversations</button>
+          <button onclick="createTestConversation()">
+            Create Test Conversation
+          </button>
+        </div>
+        <div class="conversation-list" id="conversationList"></div>
+        <div id="conversationStatus" class="status info">
+          Load conversations to see list
+        </div>
+      </div>
+
+      <!-- Message Handling -->
+      <div class="section message-section">
+        <h2>Messages</h2>
+        <div>
+          <input
+            type="text"
+            id="messageInput"
+            placeholder="Type a message..."
+          />
+          <button onclick="sendMessage()">Send Message</button>
+          <button onclick="loadMessages()">Load Messages</button>
+        </div>
+        <div class="messages" id="messageList"></div>
+        <div id="messageStatus" class="status info">
+          Select a conversation and load messages
+        </div>
+      </div>
+
+      <!-- WebSocket Status -->
+      <div class="section">
+        <h2>WebSocket Connection</h2>
+        <div id="wsStatus" class="status info">Not connected</div>
+        <div id="wsEvents"></div>
+      </div>
+    </div>
+
+    <script>
+      let currentUser = null;
+      let currentToken = null;
+      let socket = null;
+      let currentConversationId = null;
+
+      // API helper
+      async function apiCall(endpoint, method = 'GET', data = null) {
+        const options = {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        };
+
+        if (currentToken) {
+          options.headers.Authorization = `Bearer ${currentToken}`;
+        }
+
+        if (data && method !== 'GET') {
+          options.body = JSON.stringify(data);
+        }
+
+        try {
+          const response = await fetch(
+            `http://localhost:3000/api${endpoint}`,
+            options
+          );
+          return await response.json();
+        } catch (error) {
+          console.error('API call failed:', error);
+          return { success: false, error: error.message };
+        }
+      }
+
+      // User functions
+      async function login() {
+        const username = document.getElementById('userSelect').value;
+        const password = document.getElementById('passwordInput').value;
+
+        if (!username) {
+          showStatus('loginStatus', 'Please select a user', 'error');
+          return;
+        }
+
+        const result = await apiCall('/auth/login', 'POST', {
+          username,
+          password,
+        });
+
+        if (result.success) {
+          currentUser = result.data.user;
+          currentToken = result.data.token;
+          showStatus(
+            'loginStatus',
+            `Logged in as ${currentUser.username}`,
+            'success'
+          );
+          document.getElementById('userInfo').innerHTML = `
+                    <div><strong>User:</strong> ${currentUser.username}</div>
+                    <div><strong>ID:</strong> ${currentUser.id}</div>
+                `;
+          connectWebSocket();
+        } else {
+          showStatus('loginStatus', `Login failed: ${result.error}`, 'error');
+        }
+      }
+
+      // WebSocket functions
+      function connectWebSocket() {
+        if (!currentToken) {
+          showStatus('wsStatus', 'Need to login first', 'error');
+          return;
+        }
+
+        socket = io('http://localhost:3000', {
+          auth: {
+            token: currentToken,
+          },
+        });
+
+        socket.on('connect', () => {
+          showStatus('wsStatus', 'Connected to WebSocket', 'success');
+          logWsEvent('Connected to WebSocket server');
+        });
+
+        socket.on('disconnect', () => {
+          showStatus('wsStatus', 'Disconnected from WebSocket', 'error');
+          logWsEvent('Disconnected from WebSocket server');
+        });
+
+        socket.on('error', error => {
+          showStatus('wsStatus', `WebSocket error: ${error.message}`, 'error');
+          logWsEvent(`Error: ${error.message}`);
+        });
+
+        socket.on('joined_conversation', data => {
+          logWsEvent(`Joined conversation: ${data.conversationId}`);
+        });
+
+        socket.on('new_message', message => {
+          logWsEvent(
+            `New message from ${message.username}: ${message.content}`
+          );
+          if (message.conversation_id === currentConversationId) {
+            addMessageToList(message);
+          }
+        });
+
+        socket.on('typing', typingEvents => {
+          typingEvents.forEach(event => {
+            if (event.isTyping && event.userId !== currentUser.id) {
+              logWsEvent(`User ${event.userId} is typing...`);
+            }
+          });
+        });
+      }
+
+      // Conversation functions
+      async function loadConversations() {
+        if (!currentToken) {
+          showStatus('conversationStatus', 'Please login first', 'error');
+          return;
+        }
+
+        const result = await apiCall('/messages/conversations');
+
+        if (result.success) {
+          displayConversations(result.data);
+          showStatus(
+            'conversationStatus',
+            `Loaded ${result.data.length} conversations`,
+            'success'
+          );
+        } else {
+          showStatus(
+            'conversationStatus',
+            `Failed to load conversations: ${result.error}`,
+            'error'
+          );
+        }
+      }
+
+      function displayConversations(conversations) {
+        const list = document.getElementById('conversationList');
+        list.innerHTML = '';
+
+        conversations.forEach(conv => {
+          const item = document.createElement('div');
+          item.className = 'conversation-item';
+          if (conv.id === currentConversationId) {
+            item.classList.add('active');
+          }
+
+          const participantNames = conv.participants
+            ? conv.participants.map(p => p.username).join(', ')
+            : 'No participants';
+
+          item.innerHTML = `
+                    <div><strong>${conv.name || conv.type}</strong></div>
+                    <div><small>Participants: ${participantNames}</small></div>
+                    ${conv.last_message_content ? `<div><small>Last: ${conv.last_message_content}</small></div>` : ''}
+                `;
+
+          item.onclick = () => selectConversation(conv.id);
+          list.appendChild(item);
+        });
+      }
+
+      function selectConversation(conversationId) {
+        currentConversationId = conversationId;
+
+        // Update visual selection
+        document.querySelectorAll('.conversation-item').forEach(item => {
+          item.classList.remove('active');
+        });
+        event.target.closest('.conversation-item').classList.add('active');
+
+        // Join conversation via WebSocket
+        if (socket) {
+          socket.emit('join_conversation', { conversationId });
+        }
+
+        showStatus(
+          'conversationStatus',
+          `Selected conversation: ${conversationId}`,
+          'info'
+        );
+
+        // Load messages
+        loadMessages();
+      }
+
+      async function createTestConversation() {
+        if (!currentToken) {
+          showStatus('conversationStatus', 'Please login first', 'error');
+          return;
+        }
+
+        // Get available users to create conversation with
+        const result = await apiCall('/auth/login', 'POST', {
+          username: 'testuser2',
+          password: 'password123',
+        });
+
+        if (result.success) {
+          const conversationData = {
+            type: 'direct',
+            participantIds: [result.data.user.id],
+          };
+
+          const convResult = await apiCall(
+            '/messages/conversations',
+            'POST',
+            conversationData
+          );
+
+          if (convResult.success) {
+            showStatus(
+              'conversationStatus',
+              'Created new conversation successfully',
+              'success'
+            );
+            loadConversations();
+          } else {
+            showStatus(
+              'conversationStatus',
+              `Failed to create conversation: ${convResult.error}`,
+              'error'
+            );
+          }
+        } else {
+          showStatus(
+            'conversationStatus',
+            'Could not get user for conversation creation',
+            'error'
+          );
+        }
+      }
+
+      // Message functions
+      async function loadMessages() {
+        if (!currentConversationId) {
+          showStatus(
+            'messageStatus',
+            'Please select a conversation first',
+            'error'
+          );
+          return;
+        }
+
+        const result = await apiCall(
+          `/messages/conversations/${currentConversationId}/messages`
+        );
+
+        if (result.success) {
+          displayMessages(result.data);
+          showStatus(
+            'messageStatus',
+            `Loaded ${result.data.length} messages`,
+            'success'
+          );
+        } else {
+          showStatus(
+            'messageStatus',
+            `Failed to load messages: ${result.error}`,
+            'error'
+          );
+        }
+      }
+
+      function displayMessages(messages) {
+        const list = document.getElementById('messageList');
+        list.innerHTML = '';
+
+        messages.forEach(message => {
+          addMessageToList(message);
+        });
+
+        // Scroll to bottom
+        list.scrollTop = list.scrollHeight;
+      }
+
+      function addMessageToList(message) {
+        const list = document.getElementById('messageList');
+        const messageDiv = document.createElement('div');
+
+        const isOwn = message.sender_id === currentUser.id;
+        messageDiv.className = `message ${isOwn ? 'own' : 'other'}`;
+
+        const time = new Date(message.created_at).toLocaleTimeString();
+        messageDiv.innerHTML = `
+                <div><strong>${message.username || message.sender_id}</strong> - ${time}</div>
+                <div>${message.content}</div>
+            `;
+
+        list.appendChild(messageDiv);
+        list.scrollTop = list.scrollHeight;
+      }
+
+      async function sendMessage() {
+        const content = document.getElementById('messageInput').value.trim();
+
+        if (!content) {
+          showStatus('messageStatus', 'Please enter a message', 'error');
+          return;
+        }
+
+        if (!currentConversationId) {
+          showStatus(
+            'messageStatus',
+            'Please select a conversation first',
+            'error'
+          );
+          return;
+        }
+
+        // Send via REST API
+        const result = await apiCall('/messages/messages', 'POST', {
+          conversationId: currentConversationId,
+          content: content,
+        });
+
+        if (result.success) {
+          document.getElementById('messageInput').value = '';
+          showStatus('messageStatus', 'Message sent successfully', 'success');
+          // Message will be added via WebSocket event
+        } else {
+          showStatus(
+            'messageStatus',
+            `Failed to send message: ${result.error}`,
+            'error'
+          );
+        }
+      }
+
+      // UI Helper functions
+      function showStatus(elementId, message, type) {
+        const element = document.getElementById(elementId);
+        element.className = `status ${type}`;
+        element.textContent = message;
+      }
+
+      function logWsEvent(message) {
+        const eventsDiv = document.getElementById('wsEvents');
+        const eventDiv = document.createElement('div');
+        eventDiv.innerHTML = `<small>${new Date().toLocaleTimeString()}: ${message}</small>`;
+        eventsDiv.appendChild(eventDiv);
+
+        // Keep only last 10 events
+        while (eventsDiv.children.length > 10) {
+          eventsDiv.removeChild(eventsDiv.firstChild);
+        }
+      }
+
+      // Keyboard shortcuts
+      document
+        .getElementById('messageInput')
+        .addEventListener('keypress', e => {
+          if (e.key === 'Enter') {
+            sendMessage();
+          }
+        });
+
+      // Auto-test on load
+      window.onload = () => {
+        console.log('Conversation test page loaded. Ready for testing.');
+      };
+    </script>
+  </body>
+</html>

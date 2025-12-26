@@ -28,6 +28,16 @@ export class ReadReceiptRepository {
       logger.info(
         `Added read receipt for message ${messageId} by user ${userId}`
       );
+
+      if (!result) {
+        return {
+          id: readReceipt.id,
+          messageId: readReceipt.message_id,
+          userId: readReceipt.user_id,
+          readAt: readReceipt.read_at,
+        };
+      }
+
       return {
         id: result.id,
         messageId: result.message_id,

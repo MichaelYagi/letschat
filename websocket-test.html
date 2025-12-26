@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebSocket Test</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .status {
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+      .online {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .offline {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .messages {
+        height: 300px;
+        border: 1px solid #ccc;
+        padding: 10px;
+        overflow-y: auto;
+        margin-bottom: 10px;
+      }
+      .message {
+        margin-bottom: 5px;
+        padding: 5px;
+      }
+      .message.sent {
+        background-color: #e3f2fd;
+      }
+      .message.received {
+        background-color: #f8f9fa;
+      }
+      .input-area {
+        display: flex;
+        gap: 10px;
+      }
+      .input-area input {
+        flex: 1;
+        padding: 5px;
+      }
+      .input-area button {
+        padding: 5px 10px;
+      }
+      .logs {
+        height: 200px;
+        border: 1px solid #ccc;
+        padding: 10px;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        font-family: monospace;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>WebSocket Connection Test</h1>
+
+      <div class="status" id="status">
+        <div>WebSocket Status: <span id="ws-status">Not Connected</span></div>
+        <div>User: <span id="user-info">Not Logged In</span></div>
+        <div>Token: <span id="token-info">None</span></div>
+      </div>
+
+      <div>
+        <h3>Quick Login</h3>
+        <button onclick="loginAsAlice()">Login as Alice</button>
+        <button onclick="loginAsBob()">Login as Bob</button>
+      </div>
+
+      <div>
+        <h3>Test Actions</h3>
+        <button onclick="testConnection()">Test Connection</button>
+        <button onclick="testSendMessage()">Send Test Message</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+      </div>
+
+      <div class="messages" id="messages">
+        <div><em>Messages will appear here...</em></div>
+      </div>
+
+      <div class="input-area">
+        <input
+          type="text"
+          id="message-input"
+          placeholder="Type message..."
+          onkeypress="handleKeyPress(event)"
+        />
+        <button onclick="sendMessage()">Send</button>
+      </div>
+
+      <div class="logs" id="logs">
+        <div><em>Connection logs will appear here...</em></div>
+      </div>
+    </div>
+
+    <script>
+      let socket = null;
+      let token = null;
+      let currentUser = null;
+      let conversationId = '1'; // Default conversation
+
+      function log(message) {
+        const logs = document.getElementById('logs');
+        const timestamp = new Date().toLocaleTimeString();
+        logs.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+        logs.scrollTop = logs.scrollHeight;
+        console.log(message);
+      }
+
+      function updateStatus() {
+        const wsStatus = document.getElementById('ws-status');
+        const userInfo = document.getElementById('user-info');
+        const tokenInfo = document.getElementById('token-info');
+
+        if (socket && socket.connected) {
+          wsStatus.textContent = 'Connected';
+          wsStatus.parentElement.className = 'status online';
+        } else {
+          wsStatus.textContent = 'Disconnected';
+          wsStatus.parentElement.className = 'status offline';
+        }
+
+        userInfo.textContent = currentUser
+          ? currentUser.displayName || currentUser.username
+          : 'Not Logged In';
+        tokenInfo.textContent = token ? token.substring(0, 20) + '...' : 'None';
+      }
+
+      async function loginAsAlice() {
+        await login('alice', 'password123');
+      }
+
+      async function loginAsBob() {
+        await login('bob', 'password123');
+      }
+
+      async function login(username, password) {
+        try {
+          log(`Attempting login as ${username}...`);
+          const response = await fetch('http://localhost:3000/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, password }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            token = data.data.token;
+            currentUser = data.data.user;
+            log(`Login successful for ${username}`);
+            connectWebSocket();
+          } else {
+            log(`Login failed: ${data.error}`);
+          }
+
+          updateStatus();
+        } catch (error) {
+          log(`Login error: ${error.message}`);
+        }
+      }
+
+      function connectWebSocket() {
+        if (!token) {
+          log('Cannot connect WebSocket: No token available');
+          return;
+        }
+
+        log('Connecting WebSocket...');
+
+        socket = io('http://localhost:3000', {
+          auth: {
+            token: token,
+          },
+          transports: ['websocket', 'polling'],
+        });
+
+        socket.on('connect', () => {
+          log('WebSocket connected successfully');
+          log(`Socket ID: ${socket.id}`);
+          updateStatus();
+          joinConversation();
+        });
+
+        socket.on('connect_error', error => {
+          log(`WebSocket connection error: ${JSON.stringify(error)}`);
+          updateStatus();
+        });
+
+        socket.on('disconnect', reason => {
+          log(`WebSocket disconnected: ${reason}`);
+          updateStatus();
+        });
+
+        socket.on('new_message', message => {
+          log(
+            `New message received: ${message.content} from ${message.sender ? message.sender.username : 'Unknown'}`
+          );
+          addMessage(message, false);
+        });
+
+        socket.on('joined_conversation', data => {
+          log(`Joined conversation: ${data.conversationId}`);
+        });
+
+        socket.on('error', error => {
+          log(`Socket error: ${error.message}`);
+        });
+
+        updateStatus();
+      }
+
+      function joinConversation() {
+        if (!socket || !conversationId) return;
+
+        log(`Joining conversation ${conversationId}...`);
+        socket.emit('join_conversation', { conversationId });
+      }
+
+      function testConnection() {
+        log(
+          `Connection test - Socket connected: ${socket && socket.connected}, Socket ID: ${socket ? socket.id : 'null'}`
+        );
+      }
+
+      function testSendMessage() {
+        if (!socket || !socket.connected) {
+          log('Cannot send message: WebSocket not connected');
+          return;
+        }
+
+        const content = `Test message at ${new Date().toLocaleTimeString()}`;
+        log(`Sending message: ${content}`);
+
+        socket.emit('send_message', {
+          conversationId: conversationId,
+          content: content,
+        });
+
+        addMessage(
+          {
+            id: Date.now().toString(),
+            content: content,
+            sender: {
+              username: currentUser.username,
+              displayName: currentUser.displayName,
+            },
+          },
+          true
+        );
+      }
+
+      function sendMessage() {
+        const input = document.getElementById('message-input');
+        const content = input.value.trim();
+
+        if (!content || !socket || !socket.connected) {
+          return;
+        }
+
+        log(`Sending message: ${content}`);
+
+        socket.emit('send_message', {
+          conversationId: conversationId,
+          content: content,
+        });
+
+        addMessage(
+          {
+            id: Date.now().toString(),
+            content: content,
+            sender: {
+              username: currentUser.username,
+              displayName: currentUser.displayName,
+            },
+          },
+          true
+        );
+
+        input.value = '';
+      }
+
+      function addMessage(message, isOwn) {
+        const messages = document.getElementById('messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${isOwn ? 'sent' : 'received'}`;
+
+        const sender = message.sender
+          ? message.sender.displayName || message.sender.username
+          : 'Unknown';
+        messageDiv.innerHTML = `<strong>${sender}:</strong> ${message.content}`;
+
+        messages.appendChild(messageDiv);
+        messages.scrollTop = messages.scrollHeight;
+      }
+
+      function handleKeyPress(event) {
+        if (event.key === 'Enter') {
+          sendMessage();
+        }
+      }
+
+      function clearLogs() {
+        document.getElementById('logs').innerHTML =
+          '<div><em>Logs cleared...</em></div>';
+      }
+
+      // Initialize
+      updateStatus();
+
+      // Auto-login as Alice for quick testing
+      setTimeout(() => {
+        log('Auto-logging as Alice for testing...');
+        loginAsAlice();
+      }, 1000);
+    </script>
+  </body>
+</html>

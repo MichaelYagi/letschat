@@ -3,6 +3,7 @@ import { authMiddleware } from '../../config/jwt';
 import { MessageService } from '../../services/MessageService';
 import { AuthService } from '../../services/AuthService';
 import { NotificationService } from '../../services/NotificationService';
+import { UserRepository } from '../../database/repositories/UserRepository';
 import WebSocketManager from '../WebSocketManager';
 import {
   WebSocketMessage,
@@ -180,8 +181,29 @@ export class WebSocketService {
         socket.userId!
       );
 
+      // Get sender information
+      const sender = await UserRepository.findById(socket.userId!);
+
+      // Add sender info to message and map fields for client
+      const messageWithSender = {
+        ...messageEvent.message,
+        timestamp: messageEvent.message.createdAt.toISOString(), // Map createdAt to timestamp
+        sender: sender
+          ? {
+              id: sender.id,
+              username: sender.username,
+              displayName: sender.username, // Use username as displayName since User doesn't have displayName field
+              avatarUrl: sender.avatarUrl,
+            }
+          : {
+              id: socket.userId!,
+              username: socket.username || 'Unknown',
+              displayName: socket.username || 'Unknown',
+            },
+      };
+
       // Broadcast to conversation room
-      this.io.to(data.conversationId).emit('new_message', messageEvent);
+      this.io.to(data.conversationId).emit('new_message', messageWithSender);
 
       logger.info(
         `User ${socket.username} sent message to ${data.conversationId}`
