@@ -46,10 +46,7 @@ export class MessageService {
       messageData.conversationId
     );
 
-    // For now, disable encryption to allow plain text messages
-    // TODO: Implement proper end-to-end encryption later
-    /*
-    // For direct messages, encrypt for the recipient
+    // For direct messages, encrypt for the recipient if both have keys
     if (participants.length === 2) {
       const recipient = participants.find(p => p.userId !== senderId);
       if (recipient) {
@@ -58,7 +55,13 @@ export class MessageService {
         );
         const senderPrivateKey = await KeyService.getPrivateKey(senderId);
 
-        if (recipientPublicKey && senderPrivateKey) {
+        // Only encrypt if both sender and recipient have keys
+        if (
+          recipientPublicKey &&
+          senderPrivateKey &&
+          recipientPublicKey.length > 100 &&
+          senderPrivateKey.length > 100
+        ) {
           const encrypted = MessageEncryption.encryptMessage(
             content,
             recipientPublicKey,
@@ -66,11 +69,10 @@ export class MessageService {
           );
           encryptedContent = encrypted.encryptedContent;
           signature = encrypted.signature;
-          content = '[Encrypted]';
+          // Keep original content for database, encryption is handled separately
         }
       }
     }
-    */
 
     // Create message
     const message = await MessageRepository.create(

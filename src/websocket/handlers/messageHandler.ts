@@ -3,7 +3,9 @@ import { authMiddleware } from '../../config/jwt';
 import { MessageService } from '../../services/MessageService';
 import { AuthService } from '../../services/AuthService';
 import { NotificationService } from '../../services/NotificationService';
+import { MessageDecryptionService } from '../../services/MessageDecryptionService';
 import { UserRepository } from '../../database/repositories/UserRepository';
+import { ConversationRepository } from '../../database/repositories/MessageRepository';
 import WebSocketManager from '../WebSocketManager';
 import {
   WebSocketMessage,
@@ -202,8 +204,39 @@ export class WebSocketService {
             },
       };
 
-      // Broadcast to conversation room
-      this.io.to(data.conversationId).emit('new_message', messageWithSender);
+      // Get conversation participants
+      const participants = await ConversationRepository.getParticipants(
+        data.conversationId
+      );
+
+      // Send individualized messages to each participant
+      for (const participant of participants) {
+        // Decrypt message for this user
+        const decryptedMessage = await MessageDecryptionService.decryptMessage(
+          messageEvent.message,
+          participant.userId
+        );
+
+        const messageForUser = {
+          ...decryptedMessage,
+          timestamp: decryptedMessage.createdAt.toISOString(),
+          sender: sender
+            ? {
+                id: sender.id,
+                username: sender.username,
+                displayName: sender.username,
+                avatarUrl: sender.avatarUrl,
+              }
+            : {
+                id: socket.userId!,
+                username: socket.username || 'Unknown',
+                displayName: socket.username || 'Unknown',
+              },
+        };
+
+        // Send to this user's socket(s)
+        this.sendToUser(participant.userId, 'new_message', messageForUser);
+      }
 
       logger.info(
         `User ${socket.username} sent message to ${data.conversationId}`

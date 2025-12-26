@@ -81,6 +81,14 @@ export class UserRepository {
       updateData.last_seen = new Date();
     }
 
+    if (updates.publicKey !== undefined) {
+      updateData.public_key = updates.publicKey;
+    }
+
+    if (updates.privateKey !== undefined) {
+      updateData.private_key = updates.privateKey;
+    }
+
     const [user] = await db('users')
       .where('id', id)
       .update(updateData)
