@@ -46,6 +46,9 @@ export class MessageService {
       messageData.conversationId
     );
 
+    // For now, disable encryption to allow plain text messages
+    // TODO: Implement proper end-to-end encryption later
+    /*
     // For direct messages, encrypt for the recipient
     if (participants.length === 2) {
       const recipient = participants.find(p => p.userId !== senderId);
@@ -67,6 +70,7 @@ export class MessageService {
         }
       }
     }
+    */
 
     // Create message
     const message = await MessageRepository.create(
