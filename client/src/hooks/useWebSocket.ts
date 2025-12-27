@@ -63,6 +63,17 @@ export function useWebSocket(): UseWebSocketReturn {
       setMessages(prev => [...prev, message]);
     });
 
+    newSocket.on('missed_message', (message: Message) => {
+      setMessages(prev => {
+        // Check if message already exists to avoid duplicates
+        const exists = prev.some(m => m.id === message.id);
+        if (!exists) {
+          return [...prev, message];
+        }
+        return prev;
+      });
+    });
+
     newSocket.on('message_updated', (message: Message) => {
       setMessages(prev => prev.map(m => (m.id === message.id ? message : m)));
     });

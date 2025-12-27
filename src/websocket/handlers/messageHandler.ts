@@ -6,6 +6,7 @@ import { NotificationService } from '../../services/NotificationService';
 import { MessageDecryptionService } from '../../services/MessageDecryptionService';
 import { UserRepository } from '../../database/repositories/UserRepository';
 import { ConversationRepository } from '../../database/repositories/MessageRepository';
+import { ReadReceiptRepository } from '../../database/repositories/ReadReceiptRepository';
 import WebSocketManager from '../WebSocketManager';
 import {
   WebSocketMessage,
@@ -26,9 +27,12 @@ export class WebSocketService {
   private io: SocketIOServer;
   private connectedUsers: Map<string, AuthenticatedSocket[]> = new Map();
   private typingUsers: Map<string, Set<string>> = new Map(); // conversationId -> Set of userIds
+  private offlineMessageQueue: Map<string, any[]> = new Map(); // userId -> queued messages
+  private readReceiptRepository: ReadReceiptRepository;
 
   constructor(io: SocketIOServer) {
     this.io = io;
+    this.readReceiptRepository = new ReadReceiptRepository();
     this.setupMiddleware();
     this.setupEventHandlers();
     this.startHeartbeat();
@@ -71,15 +75,15 @@ export class WebSocketService {
    * Setup event handlers
    */
   private setupEventHandlers(): void {
-    this.io.on('connection', (socket: AuthenticatedSocket) => {
-      this.handleConnection(socket);
+    this.io.on('connection', async (socket: AuthenticatedSocket) => {
+      await this.handleConnection(socket);
     });
   }
 
   /**
    * Handle new connection
    */
-  private handleConnection(socket: AuthenticatedSocket): void {
+  private async handleConnection(socket: AuthenticatedSocket): Promise<void> {
     logger.info(`User ${socket.username} (${socket.userId}) connected`);
 
     // Add to connected users
@@ -90,6 +94,12 @@ export class WebSocketService {
 
     // Update user status to online
     this.broadcastUserStatus(socket.userId!, 'online');
+
+    // Deliver queued messages for this user
+    await this.deliverQueuedMessages(socket);
+
+    // Fetch and deliver any missed messages from database
+    await this.deliverMissedMessages(socket);
 
     // Setup event listeners for this socket
     socket.on('join_conversation', data =>
@@ -211,6 +221,11 @@ export class WebSocketService {
 
       // Send individualized messages to each participant
       for (const participant of participants) {
+        // Don't send to sender
+        if (participant.userId === socket.userId) {
+          continue;
+        }
+
         // Decrypt message for this user
         const decryptedMessage = await MessageDecryptionService.decryptMessage(
           messageEvent.message,
@@ -234,8 +249,24 @@ export class WebSocketService {
               },
         };
 
-        // Send to this user's socket(s)
-        this.sendToUser(participant.userId, 'new_message', messageForUser);
+        // Check if user is online
+        if (this.connectedUsers.has(participant.userId)) {
+          // User is online - send immediately and mark as delivered
+          this.sendToUser(participant.userId, 'new_message', messageForUser);
+          await this.readReceiptRepository.updateDeliveryStatus(
+            messageEvent.message.id,
+            participant.userId,
+            'delivered'
+          );
+        } else {
+          // User is offline - queue message for later delivery
+          this.queueOfflineMessage(participant.userId, messageForUser);
+          await this.readReceiptRepository.updateDeliveryStatus(
+            messageEvent.message.id,
+            participant.userId,
+            'sent'
+          );
+        }
       }
 
       logger.info(
@@ -429,6 +460,133 @@ export class WebSocketService {
     }));
 
     this.io.to(conversationId).emit('typing', typingEvent);
+  }
+
+  /**
+   * Queue message for offline user
+   */
+  private queueOfflineMessage(userId: string, message: any): void {
+    if (!this.offlineMessageQueue.has(userId)) {
+      this.offlineMessageQueue.set(userId, []);
+    }
+
+    const queue = this.offlineMessageQueue.get(userId)!;
+    queue.push(message);
+
+    logger.info(
+      `Queued message for offline user ${userId}. Queue size: ${queue.length}`
+    );
+  }
+
+  /**
+   * Deliver missed messages from database for offline user
+   */
+  private async deliverMissedMessages(
+    socket: AuthenticatedSocket
+  ): Promise<void> {
+    try {
+      const userId = socket.userId!;
+
+      // Get user's conversations
+      const conversations = await MessageService.getConversations(userId);
+
+      for (const conversation of conversations) {
+        // Get messages since user's last activity - simplified version for now
+        // We'll use a simpler approach to avoid dependency on getMessagesSince method
+        const messages = await MessageService.getMessages(
+          conversation.id,
+          userId,
+          50
+        );
+
+        if (messages.length > 0) {
+          for (const message of messages) {
+            // Only deliver messages sent by others
+            if (message.senderId === userId) continue;
+
+            // Get sender information
+            const sender = await UserRepository.findById(message.senderId);
+
+            // Decrypt message for this user
+            const decryptedMessage =
+              await MessageDecryptionService.decryptMessage(message, userId);
+
+            const messageForUser = {
+              ...decryptedMessage,
+              timestamp: decryptedMessage.createdAt.toISOString(),
+              sender: sender
+                ? {
+                    id: sender.id,
+                    username: sender.username,
+                    displayName: sender.username,
+                    avatarUrl: sender.avatarUrl,
+                  }
+                : {
+                    id: message.senderId,
+                    username: 'Unknown',
+                    displayName: 'Unknown',
+                  },
+            };
+
+            socket.emit('missed_message', messageForUser);
+
+            // Update delivery status
+            await this.readReceiptRepository.updateDeliveryStatus(
+              message.id,
+              userId,
+              'delivered'
+            );
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Error delivering missed messages:', error);
+    }
+  }
+
+  /**
+   * Deliver queued messages to reconnected user
+   */
+  private async deliverQueuedMessages(
+    socket: AuthenticatedSocket
+  ): Promise<void> {
+    const userId = socket.userId!;
+    const queuedMessages = this.offlineMessageQueue.get(userId);
+
+    if (!queuedMessages || queuedMessages.length === 0) {
+      return;
+    }
+
+    try {
+      logger.info(
+        `Delivering ${queuedMessages.length} queued messages to user ${userId}`
+      );
+
+      // Deliver all queued messages
+      for (const message of queuedMessages) {
+        socket.emit('new_message', message);
+
+        // Update delivery status to delivered
+        await this.readReceiptRepository.updateDeliveryStatus(
+          message.id,
+          userId,
+          'delivered'
+        );
+      }
+
+      // Clear the queue for this user
+      this.offlineMessageQueue.delete(userId);
+
+      logger.info(
+        `Successfully delivered ${queuedMessages.length} messages to user ${userId}`
+      );
+    } catch (error) {
+      logger.error('Error delivering queued messages:', error);
+      socket.emit('error', {
+        message:
+          'Some messages failed to deliver. Please refresh the conversation.',
+      });
+    }
   }
 
   /**

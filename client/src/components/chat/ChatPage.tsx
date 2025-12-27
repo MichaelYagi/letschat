@@ -46,7 +46,7 @@ export function ChatPage({ conversationName }: ChatPageProps) {
       setIsLoading(false);
       markConversationAsRead();
     }
-  }, [connected, conversationId, joinConversation]);
+  }, [connected, conversationId]);
 
   // Show notification for new messages
   useEffect(() => {
@@ -65,13 +65,7 @@ export function ChatPage({ conversationName }: ChatPageProps) {
       });
       playNotificationSound();
     }
-  }, [
-    messages,
-    user?.id,
-    addNotification,
-    conversationName,
-    playNotificationSound,
-  ]);
+  }, [messages, user?.id, conversationName]);
 
   const handleSendMessage = (content: string) => {
     if (conversationId) {
