@@ -16,7 +16,7 @@ export interface Message {
   id: string;
   conversationId: string;
   senderId: string;
-  content: string;
+  content?: string; // Optional since we only store encrypted content
   contentType: 'text' | 'image' | 'file' | 'system';
   encryptedContent?: string;
   signature?: string;

@@ -10,9 +10,12 @@ export class MessageDecryptionService {
     message: Message,
     userId: string
   ): Promise<Message> {
-    // If message is not encrypted, return as-is
+    // If message is not encrypted, return placeholder (no plaintext stored)
     if (!message.encryptedContent || !message.signature) {
-      return message;
+      return {
+        ...message,
+        content: '[Message cannot be displayed - encryption required]',
+      };
     }
 
     // Get user's private key and sender's public key

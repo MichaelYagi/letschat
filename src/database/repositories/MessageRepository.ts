@@ -26,7 +26,6 @@ export class MessageRepository {
         id: messageId,
         conversation_id: messageData.conversationId,
         sender_id: senderId,
-        content: messageData.content,
         content_type: messageData.contentType || 'text',
         encrypted_content: messageData.encryptedContent,
         signature: messageData.signature,
@@ -123,7 +122,7 @@ export class MessageRepository {
       id: dbMessage.id,
       conversationId: dbMessage.conversation_id,
       senderId: dbMessage.sender_id,
-      content: dbMessage.content,
+      content: dbMessage.content || '[Encrypted Message]', // Fallback for legacy messages
       contentType: dbMessage.content_type,
       encryptedContent: dbMessage.encrypted_content,
       signature: dbMessage.signature,

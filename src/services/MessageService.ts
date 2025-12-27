@@ -37,7 +37,7 @@ export class MessageService {
       throw new Error('User is not a participant in this conversation');
     }
 
-    let content = messageData.content;
+    let content: string;
     let encryptedContent: string | undefined;
     let signature: string | undefined;
 
@@ -46,7 +46,7 @@ export class MessageService {
       messageData.conversationId
     );
 
-    // For direct messages, encrypt for the recipient if both have keys
+    // For direct messages, encrypt for recipient if both have keys
     if (participants.length === 2) {
       const recipient = participants.find(p => p.userId !== senderId);
       if (recipient) {
@@ -63,23 +63,33 @@ export class MessageService {
           senderPrivateKey.length > 100
         ) {
           const encrypted = MessageEncryption.encryptMessage(
-            content,
+            messageData.content,
             recipientPublicKey,
             senderPrivateKey
           );
           encryptedContent = encrypted.encryptedContent;
           signature = encrypted.signature;
-          // Keep original content for database, encryption is handled separately
+          // No content stored - only encrypted content
+          content = undefined;
+        } else {
+          // Fallback to placeholder if keys missing
+          content = '[Keys unavailable - cannot encrypt]';
         }
+      } else {
+        // Fallback to placeholder if no recipient found
+        content = '[Recipient not found - cannot encrypt]';
       }
+    } else {
+      // For group messages, store placeholder for now (future: implement group encryption)
+      content = '[Group message encryption not implemented]';
     }
 
     // Create message
     const message = await MessageRepository.create(
       {
         ...messageData,
-        content,
         encryptedContent,
+        signature,
       },
       senderId
     );
