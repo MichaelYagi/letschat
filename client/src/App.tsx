@@ -51,10 +51,7 @@ function AppContent() {
               <Route path='/' element={<ConversationListWrapper />} />
               <Route path='/chat/:conversationId' element={<ChatPage />} />
               <Route path='/friends' element={<Connections />} />
-              <Route
-                path='/profile'
-                element={<UserProfile onClose={() => {}} />}
-              />
+              <Route path='/profile' element={<UserProfile />} />
               <Route
                 path='/settings'
                 element={<NotificationSettings onClose={() => {}} />}

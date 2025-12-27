@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Camera, Edit2, Save, X, Mail, Calendar, Shield } from 'lucide-react';
+import { Camera, Edit2, Save, X, Calendar, Shield } from 'lucide-react';
 
 interface UserProfileProps {
   onClose?: () => void;
@@ -8,11 +9,9 @@ interface UserProfileProps {
 
 export function UserProfile({ onClose }: UserProfileProps) {
   const { user, updateProfile } = useAuth();
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    displayName: user?.displayName || '',
-    email: user?.email || '',
-    bio: '',
     avatarUrl: user?.avatarUrl || '',
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -24,8 +23,6 @@ export function UserProfile({ onClose }: UserProfileProps) {
       setError('');
 
       await updateProfile({
-        displayName: formData.displayName,
-        bio: formData.bio,
         avatarUrl: formData.avatarUrl,
       });
 
@@ -39,9 +36,6 @@ export function UserProfile({ onClose }: UserProfileProps) {
 
   const handleCancel = () => {
     setFormData({
-      displayName: user?.displayName || '',
-      email: user?.email || '',
-      bio: '',
       avatarUrl: user?.avatarUrl || '',
     });
     setIsEditing(false);
@@ -79,9 +73,7 @@ export function UserProfile({ onClose }: UserProfileProps) {
       <div className='bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto m-4'>
         {/* Header */}
         <div className='flex items-center justify-between p-6 border-b border-gray-200'>
-          <h2 className='text-xl font-semibold text-gray-900'>
-            Profile Settings
-          </h2>
+          <h2 className='text-xl font-semibold text-gray-900'>Profile</h2>
           <div className='flex items-center space-x-2'>
             {!isEditing ? (
               <button
@@ -114,14 +106,18 @@ export function UserProfile({ onClose }: UserProfileProps) {
                 </button>
               </div>
             )}
-            {onClose && (
-              <button
-                onClick={onClose}
-                className='p-2 text-gray-400 hover:text-gray-600 rounded-full'
-              >
-                <X size={20} />
-              </button>
-            )}
+            <button
+              onClick={() => {
+                if (onClose) {
+                  onClose();
+                } else {
+                  navigate(-1); // Go back to previous page
+                }
+              }}
+              className='p-2 text-gray-400 hover:text-gray-600 rounded-full'
+            >
+              <X size={20} />
+            </button>
           </div>
         </div>
 
@@ -142,11 +138,10 @@ export function UserProfile({ onClose }: UserProfileProps) {
                     {formData.avatarUrl ? (
                       <img
                         src={formData.avatarUrl}
-                        alt={formData.displayName}
+                        alt={user.username}
                         className='w-full h-full rounded-full object-cover'
                       />
                     ) : (
-                      formData.displayName?.[0]?.toUpperCase() ||
                       user.username[0]?.toUpperCase()
                     )}
                   </div>
@@ -177,29 +172,10 @@ export function UserProfile({ onClose }: UserProfileProps) {
               <div>
                 <h3 className='text-lg font-medium text-gray-900 mb-4 flex items-center'>
                   <Shield className='mr-2' size={20} />
-                  Basic Information
+                  Information
                 </h3>
 
                 <div className='space-y-4'>
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>
-                      Display Name
-                    </label>
-                    <input
-                      type='text'
-                      value={formData.displayName}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          displayName: e.target.value,
-                        })
-                      }
-                      disabled={!isEditing}
-                      className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100'
-                      placeholder='Your display name'
-                    />
-                  </div>
-
                   <div>
                     <label className='block text-sm font-medium text-gray-700 mb-1'>
                       Username
@@ -213,45 +189,6 @@ export function UserProfile({ onClose }: UserProfileProps) {
                     />
                     <p className='text-xs text-gray-500 mt-1'>
                       Username cannot be changed
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>
-                      Email
-                    </label>
-                    <div className='flex items-center space-x-2'>
-                      <Mail size={20} className='text-gray-400' />
-                      <input
-                        type='email'
-                        value={formData.email}
-                        onChange={e =>
-                          setFormData({ ...formData, email: e.target.value })
-                        }
-                        disabled={!isEditing}
-                        className='flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100'
-                        placeholder='your@email.com'
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className='block text-sm font-medium text-gray-700 mb-1'>
-                      Bio
-                    </label>
-                    <textarea
-                      value={formData.bio}
-                      onChange={e =>
-                        setFormData({ ...formData, bio: e.target.value })
-                      }
-                      disabled={!isEditing}
-                      rows={3}
-                      className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 resize-none'
-                      placeholder='Tell us about yourself...'
-                      maxLength={200}
-                    />
-                    <p className='text-xs text-gray-500 mt-1'>
-                      {formData.bio.length}/200 characters
                     </p>
                   </div>
                 </div>
