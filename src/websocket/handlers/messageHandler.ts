@@ -221,33 +221,41 @@ export class WebSocketService {
 
       // Send individualized messages to each participant
       for (const participant of participants) {
-        // Don't send to sender
+        // Prepare message for this user (including sender)
+        let messageForUser;
+
         if (participant.userId === socket.userId) {
-          continue;
+          // For sender, use the original message with sender info
+          messageForUser = {
+            ...messageWithSender,
+            isOwn: true, // Mark as own message for the sender
+          };
+        } else {
+          // For other users, decrypt message for this user
+          const decryptedMessage =
+            await MessageDecryptionService.decryptMessage(
+              messageEvent.message,
+              participant.userId
+            );
+
+          messageForUser = {
+            ...decryptedMessage,
+            timestamp: decryptedMessage.createdAt.toISOString(),
+            sender: sender
+              ? {
+                  id: sender.id,
+                  username: sender.username,
+                  displayName: sender.username,
+                  avatarUrl: sender.avatarUrl,
+                }
+              : {
+                  id: socket.userId!,
+                  username: socket.username || 'Unknown',
+                  displayName: socket.username || 'Unknown',
+                },
+            isOwn: false,
+          };
         }
-
-        // Decrypt message for this user
-        const decryptedMessage = await MessageDecryptionService.decryptMessage(
-          messageEvent.message,
-          participant.userId
-        );
-
-        const messageForUser = {
-          ...decryptedMessage,
-          timestamp: decryptedMessage.createdAt.toISOString(),
-          sender: sender
-            ? {
-                id: sender.id,
-                username: sender.username,
-                displayName: sender.username,
-                avatarUrl: sender.avatarUrl,
-              }
-            : {
-                id: socket.userId!,
-                username: socket.username || 'Unknown',
-                displayName: socket.username || 'Unknown',
-              },
-        };
 
         // Check if user is online
         if (this.connectedUsers.has(participant.userId)) {

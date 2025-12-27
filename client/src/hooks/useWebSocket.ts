@@ -60,7 +60,19 @@ export function useWebSocket(): UseWebSocketReturn {
     });
 
     newSocket.on('new_message', (message: Message) => {
-      setMessages(prev => [...prev, message]);
+      setMessages(prev => {
+        // Check if message already exists to avoid duplicates
+        const exists = prev.some(m => m.id === message.id);
+        if (exists) {
+          return prev;
+        }
+        // Add message and sort by timestamp to maintain proper order
+        const updated = [...prev, message];
+        return updated.sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+      });
     });
 
     newSocket.on('missed_message', (message: Message) => {
@@ -68,7 +80,12 @@ export function useWebSocket(): UseWebSocketReturn {
         // Check if message already exists to avoid duplicates
         const exists = prev.some(m => m.id === message.id);
         if (!exists) {
-          return [...prev, message];
+          // Add message and sort by timestamp to maintain proper order
+          const updated = [...prev, message];
+          return updated.sort(
+            (a, b) =>
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          );
         }
         return prev;
       });
