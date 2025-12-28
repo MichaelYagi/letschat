@@ -3,7 +3,7 @@ import {
   ConversationRepository,
 } from '../database/repositories/MessageRepository';
 import { KeyService } from './KeyService';
-import { MessageDecryptionService } from './MessageDecryptionService';
+import { ConversationEncryptionService } from './ConversationEncryptionService';
 import {
   Message,
   CreateMessageRequest,
@@ -17,7 +17,7 @@ import {
   UserStatusEvent,
   ConversationUpdateEvent,
 } from '../types/Message';
-import { EncryptionService, MessageEncryption } from '../utils/encryption';
+import { EncryptionService } from '../utils/encryption';
 
 export class MessageService {
   /**
@@ -34,73 +34,51 @@ export class MessageService {
     );
 
     if (!isParticipant) {
+      // Provide more detailed error for debugging
+      console.error(
+        `[DEBUG] User ${senderId} not found in conversation ${messageData.conversationId}`
+      );
       throw new Error('User is not a participant in this conversation');
     }
 
-    let content: string;
-    let encryptedContent: string | undefined;
-    let signature: string | undefined;
-
-    // Get conversation participants for encryption
-    const participants = await ConversationRepository.getParticipants(
-      messageData.conversationId
+    // Get conversation encryption key
+    const encryptionKey = await KeyService.getConversationKey(
+      messageData.conversationId,
+      senderId
     );
 
-    // For direct messages, encrypt for recipient if both have keys
-    if (participants.length === 2) {
-      const recipient = participants.find(p => p.userId !== senderId);
-      if (recipient) {
-        const recipientPublicKey = await KeyService.getPublicKey(
-          recipient.userId
-        );
-        const senderPrivateKey = await KeyService.getPrivateKey(senderId);
-
-        // Only encrypt if both sender and recipient have keys
-        if (
-          recipientPublicKey &&
-          senderPrivateKey &&
-          recipientPublicKey.length > 100 &&
-          senderPrivateKey.length > 100
-        ) {
-          const encrypted = MessageEncryption.encryptMessage(
-            messageData.content,
-            recipientPublicKey,
-            senderPrivateKey
-          );
-          encryptedContent = encrypted.encryptedContent;
-          signature = encrypted.signature;
-          // No content stored - only encrypted content
-          content = undefined;
-        } else {
-          // Fallback to placeholder if keys missing
-          content = '[Keys unavailable - cannot encrypt]';
-        }
-      } else {
-        // Fallback to placeholder if no recipient found
-        content = '[Recipient not found - cannot encrypt]';
-      }
-    } else {
-      // For group messages, store placeholder for now (future: implement group encryption)
-      content = '[Group message encryption not implemented]';
+    if (!encryptionKey) {
+      throw new Error('Conversation encryption key not found');
     }
 
-    // Create message
+    // Encrypt message content with conversation key
+    const encrypted = ConversationEncryptionService.encryptMessageContent(
+      messageData.content,
+      encryptionKey
+    );
+
+    // Create message with encrypted content
     const message = await MessageRepository.create(
       {
         ...messageData,
-        encryptedContent,
-        signature,
+        encryptedContent: encrypted.encryptedContent,
+        iv: encrypted.iv,
+        tag: encrypted.tag,
       },
       senderId
     );
 
-    // Signature is stored with the message in the database
-
     // Update conversation timestamp
     await this.updateConversationTimestamp(messageData.conversationId);
 
+    // Return message with decrypted content for sender
+    const decryptedMessage = {
+      ...message,
+      content: messageData.content, // Show plain text to sender
+    };
+
     return {
-      message,
+      message: decryptedMessage,
       attachments: [],
     };
   }
@@ -124,14 +102,55 @@ export class MessageService {
       throw new Error('User is not a participant in this conversation');
     }
 
+    // Get conversation encryption key
+    const encryptionKey = await KeyService.getConversationKey(
+      conversationId,
+      userId
+    );
+
+    if (!encryptionKey) {
+      throw new Error('Conversation encryption key not found');
+    }
+
     const messages = await MessageRepository.getByConversationId(
       conversationId,
       limit,
       before
     );
 
-    // Decrypt messages for this user
-    return await MessageDecryptionService.decryptMessages(messages, userId);
+    // Decrypt messages for this user using conversation key
+    return messages.map(message => {
+      if (message.encryptedContent && message.iv && message.tag) {
+        try {
+          const decryptedContent =
+            ConversationEncryptionService.decryptMessageContent(
+              message.encryptedContent,
+              message.iv,
+              message.tag,
+              encryptionKey
+            );
+
+          return {
+            ...message,
+            content: decryptedContent, // Show decrypted content
+          };
+        } catch (error) {
+          console.error('Failed to decrypt message:', error);
+          return {
+            ...message,
+            content: '[Decryption failed]',
+          };
+        }
+      } else if (message.content) {
+        // Legacy message with plain content
+        return message;
+      } else {
+        return {
+          ...message,
+          content: '[Encrypted Message]',
+        };
+      }
+    });
   }
 
   /**
@@ -220,7 +239,14 @@ export class MessageService {
       }
     }
 
-    return await ConversationRepository.create(conversationData, createdBy);
+    // Create conversation with encryption key
+    return await ConversationRepository.create(
+      {
+        ...conversationData,
+        encryptionKey: KeyService.generateConversationKey(),
+      },
+      createdBy
+    );
   }
 
   /**
@@ -338,10 +364,23 @@ export class MessageService {
     conversationId: string,
     userId: string
   ): Promise<boolean> {
+    // First check if user is explicitly a participant
+    const db = require('../database/connection').default;
+    const participant = await db('conversation_participants')
+      .where('conversation_id', conversationId)
+      .where('user_id', userId)
+      .first();
+
+    if (!participant) {
+      return false;
+    }
+
+    // Also verify conversation exists
     const conversation = await ConversationRepository.findById(
       conversationId,
       userId
     );
+
     return !!conversation;
   }
 

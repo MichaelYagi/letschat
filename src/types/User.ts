@@ -7,16 +7,11 @@ export interface User {
   lastSeen: Date;
   createdAt: Date;
   updatedAt: Date;
-  publicKey?: string;
-  privateKey?: string;
 }
 
 export interface CreateUserRequest {
   username: string;
   password: string;
-  generateKeys?: boolean;
-  publicKey?: string;
-  privateKey?: string;
 }
 
 export interface UpdateUserRequest {

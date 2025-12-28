@@ -19,7 +19,8 @@ export interface Message {
   content?: string; // Optional since we only store encrypted content
   contentType: 'text' | 'image' | 'file' | 'system';
   encryptedContent?: string;
-  signature?: string;
+  iv?: string;
+  tag?: string;
   replyToId?: string;
   threadId?: string;
   editedAt?: Date;
@@ -33,7 +34,8 @@ export interface CreateMessageRequest {
   content: string;
   contentType?: 'text' | 'image' | 'file' | 'system';
   encryptedContent?: string;
-  signature?: string;
+  iv?: string;
+  tag?: string;
   replyToId?: string;
   threadId?: string;
 }
@@ -60,6 +62,7 @@ export interface Conversation {
   description?: string;
   avatarUrl?: string;
   createdBy: string;
+  encryptionKey: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,6 +73,7 @@ export interface CreateConversationRequest {
   description?: string;
   avatarUrl?: string;
   participantIds: string[];
+  encryptionKey?: string;
 }
 
 export interface ConversationParticipant {

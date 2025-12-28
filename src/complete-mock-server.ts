@@ -196,7 +196,6 @@ app.put('/api/v1/connections/:requestId/accept', (req, res) => {
     }
 
     mockPendingRequests[requestIndex].status = 'accepted';
-    mockPendingRequests[requestIndex].updatedAt = new Date().toISOString();
 
     // Create accepted connection
     const acceptedConnection = {

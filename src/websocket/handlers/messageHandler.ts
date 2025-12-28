@@ -3,7 +3,7 @@ import { authMiddleware } from '../../config/jwt';
 import { MessageService } from '../../services/MessageService';
 import { AuthService } from '../../services/AuthService';
 import { NotificationService } from '../../services/NotificationService';
-import { MessageDecryptionService } from '../../services/MessageDecryptionService';
+
 import { UserRepository } from '../../database/repositories/UserRepository';
 import { ConversationRepository } from '../../database/repositories/MessageRepository';
 import { ReadReceiptRepository } from '../../database/repositories/ReadReceiptRepository';
@@ -97,6 +97,9 @@ export class WebSocketService {
 
     // Deliver queued messages for this user
     await this.deliverQueuedMessages(socket);
+
+    // Fetch and deliver any missed messages from database
+    await this.deliverMissedMessages(socket);
 
     // Fetch and deliver any missed messages from database
     await this.deliverMissedMessages(socket);
@@ -231,16 +234,10 @@ export class WebSocketService {
             isOwn: true, // Mark as own message for the sender
           };
         } else {
-          // For other users, decrypt message for this user
-          const decryptedMessage =
-            await MessageDecryptionService.decryptMessage(
-              messageEvent.message,
-              participant.userId
-            );
-
+          // For other users, send the message as is (encryption is handled in MessageService)
           messageForUser = {
-            ...decryptedMessage,
-            timestamp: decryptedMessage.createdAt.toISOString(),
+            ...messageEvent.message,
+            timestamp: messageEvent.message.createdAt.toISOString(),
             sender: sender
               ? {
                   id: sender.id,
@@ -516,12 +513,10 @@ export class WebSocketService {
             const sender = await UserRepository.findById(message.senderId);
 
             // Decrypt message for this user
-            const decryptedMessage =
-              await MessageDecryptionService.decryptMessage(message, userId);
-
+            // MessageService already handles decryption in getMessages
             const messageForUser = {
-              ...decryptedMessage,
-              timestamp: decryptedMessage.createdAt.toISOString(),
+              ...message,
+              timestamp: message.createdAt.toISOString(),
               sender: sender
                 ? {
                     id: sender.id,

@@ -4,6 +4,8 @@ import {
   ConversationParticipant,
   CreateConversationRequest,
 } from '../../types/Message';
+import { ConversationEncryptionService } from '../../services/ConversationEncryptionService';
+import { EncryptionService } from '../../utils/encryption';
 
 export class ConversationRepository {
   /**
@@ -13,25 +15,43 @@ export class ConversationRepository {
     conversationData: CreateConversationRequest,
     createdBy: string
   ): Promise<Conversation> {
+    const encryptionKey = ConversationEncryptionService.generateEncryptionKey();
+    console.log('🔍 Repository Debug - Generated key:', encryptionKey);
+
     const conversation = await db('conversations')
       .insert({
+        id: EncryptionService.generateUUID(),
         type: conversationData.type,
         name: conversationData.name,
         description: conversationData.description,
         avatar_url: conversationData.avatarUrl,
         created_by: createdBy,
+        encryption_key: encryptionKey,
         created_at: new Date(),
         updated_at: new Date(),
       })
       .returning('*');
 
-    // Add participants
+    // Verify the key was actually saved
+    const verifyConv = await db('conversations')
+      .where('id', conversation[0].id)
+      .first();
+    if (!verifyConv.encryption_key) {
+      console.error(
+        '❌ CRITICAL: Encryption key was not saved! Insert succeeded but key missing in DB'
+      );
+      throw new Error('Encryption key save failure');
+    }
+
+    // Add participants (avoid duplicates)
     const participants = [
       { userId: createdBy, role: 'admin' as const },
-      ...conversationData.participantIds.map(userId => ({
-        userId,
-        role: 'member' as const,
-      })),
+      ...conversationData.participantIds
+        .filter(userId => userId !== createdBy)
+        .map(userId => ({
+          userId,
+          role: 'member' as const,
+        })),
     ];
 
     await this.addParticipants({
@@ -46,6 +66,7 @@ export class ConversationRepository {
       description: conversation[0].description,
       avatarUrl: conversation[0].avatar_url,
       createdBy: conversation[0].created_by,
+      encryptionKey: conversation[0].encryption_key,
       createdAt: conversation[0].created_at,
       updatedAt: conversation[0].updated_at,
     };
@@ -83,6 +104,7 @@ export class ConversationRepository {
       description: conversation.description,
       avatarUrl: conversation.avatar_url,
       createdBy: conversation.created_by,
+      encryptionKey: conversation.encryption_key,
       createdAt: conversation.created_at,
       updatedAt: conversation.updated_at,
     };
@@ -109,6 +131,7 @@ export class ConversationRepository {
       description: conv.description,
       avatarUrl: conv.avatar_url,
       createdBy: conv.created_by,
+      encryptionKey: conv.encryption_key,
       createdAt: conv.created_at,
       updatedAt: conv.updated_at,
     }));
@@ -220,6 +243,7 @@ export class ConversationRepository {
       description: conversation.description,
       avatarUrl: conversation.avatar_url,
       createdBy: conversation.created_by,
+      encryptionKey: conversation.encryption_key,
       createdAt: conversation.created_at,
       updatedAt: conversation.updated_at,
     };

@@ -22,8 +22,6 @@ export class UserRepository {
         id: userId,
         username: userData.username.toLowerCase(),
         password_hash: passwordHash,
-        public_key: userData.publicKey,
-        private_key: userData.privateKey,
         status: 'offline',
         created_at: new Date(),
         updated_at: new Date(),
@@ -79,14 +77,6 @@ export class UserRepository {
     if (updates.status !== undefined) {
       updateData.status = updates.status;
       updateData.last_seen = new Date();
-    }
-
-    if (updates.publicKey !== undefined) {
-      updateData.public_key = updates.publicKey;
-    }
-
-    if (updates.privateKey !== undefined) {
-      updateData.private_key = updates.privateKey;
     }
 
     const [user] = await db('users')
@@ -226,8 +216,6 @@ export class UserRepository {
       lastSeen: new Date(dbUser.last_seen),
       createdAt: new Date(dbUser.created_at),
       updatedAt: new Date(dbUser.updated_at),
-      publicKey: dbUser.public_key,
-      privateKey: dbUser.private_key,
     };
   }
 

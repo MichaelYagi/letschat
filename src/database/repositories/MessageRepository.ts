@@ -28,7 +28,8 @@ export class MessageRepository {
         sender_id: senderId,
         content_type: messageData.contentType || 'text',
         encrypted_content: messageData.encryptedContent,
-        signature: messageData.signature,
+        iv: messageData.iv,
+        tag: messageData.tag,
         reply_to_id: messageData.replyToId,
         thread_id: messageData.threadId,
         created_at: new Date(),
@@ -115,8 +116,33 @@ export class MessageRepository {
   }
 
   /**
-   * Map database message to Message model
+   * Get or create shared key for conversation
    */
+  static async getSharedKey(conversationId: string): Promise<string | null> {
+    const key = await db('conversation_keys')
+      .where({ conversation_id: conversationId })
+      .first();
+    return key ? key.key : null;
+  }
+
+  static async generateSharedKey(conversationId: string): Promise<string> {
+    // Check for existing key
+    const existingKey = await this.getSharedKey(conversationId);
+    if (existingKey) {
+      return existingKey;
+    }
+
+    // Generate new shared key
+    const newKey = EncryptionService.generateRandomString(32);
+    await db('conversation_keys').insert({
+      conversation_id: conversationId,
+      key: newKey,
+      created_at: new Date(),
+    });
+
+    return newKey;
+  }
+
   private static mapDbMessageToMessage(dbMessage: any): Message {
     return {
       id: dbMessage.id,
@@ -125,7 +151,8 @@ export class MessageRepository {
       content: dbMessage.content || '[Encrypted Message]', // Fallback for legacy messages
       contentType: dbMessage.content_type,
       encryptedContent: dbMessage.encrypted_content,
-      signature: dbMessage.signature,
+      iv: dbMessage.iv,
+      tag: dbMessage.tag,
       replyToId: dbMessage.reply_to_id,
       threadId: dbMessage.thread_id,
       editedAt: dbMessage.edited_at ? new Date(dbMessage.edited_at) : undefined,
@@ -155,6 +182,7 @@ export class ConversationRepository {
         description: conversationData.description,
         avatar_url: conversationData.avatarUrl,
         created_by: createdBy,
+        encryption_key: conversationData.encryptionKey || null,
         created_at: new Date(),
         updated_at: new Date(),
       })
@@ -312,6 +340,7 @@ export class ConversationRepository {
       description: dbConversation.description,
       avatarUrl: dbConversation.avatar_url,
       createdBy: dbConversation.created_by,
+      encryptionKey: dbConversation.encryption_key,
       createdAt: new Date(dbConversation.created_at),
       updatedAt: new Date(dbConversation.updated_at),
     };
