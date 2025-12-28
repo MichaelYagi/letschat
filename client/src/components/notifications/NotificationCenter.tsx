@@ -37,6 +37,27 @@ export function NotificationCenter() {
     }
   }, [user, socket]);
 
+  // Listen for user login events to load notifications
+  useEffect(() => {
+    const handleUserLoggedIn = () => {
+      if (user) {
+        loadNotifications();
+      }
+    };
+
+    window.addEventListener('userLoggedIn', handleUserLoggedIn);
+    return () => {
+      window.removeEventListener('userLoggedIn', handleUserLoggedIn);
+    };
+  }, [user]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (user && socket) {
+      loadNotifications();
+    }
+  }, [user, socket]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
