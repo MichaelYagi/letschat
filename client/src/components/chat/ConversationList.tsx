@@ -19,7 +19,6 @@ interface Conversation {
   name: string | null;
   participant?: {
     username: string;
-
     status: string;
   } | null;
   lastMessage?: {
@@ -43,13 +42,20 @@ export function ConversationList({
   const { startCall } = useCalling();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // User search state for direct messages
   const [showUserSearch, setShowUserSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userSearchResults, setUserSearchResults] = useState<any[]>([]);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
+
+  // Group creation state
   const [showGroupCreation, setShowGroupCreation] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [groupSearchQuery, setGroupSearchQuery] = useState('');
+  const [groupSearchResults, setGroupSearchResults] = useState<any[]>([]);
+  const [groupSearchLoading, setGroupSearchLoading] = useState(false);
 
   useEffect(() => {
     loadConversations();
@@ -58,7 +64,12 @@ export function ConversationList({
   const loadConversations = async () => {
     try {
       const response = await conversationsApi.getConversations();
-      setConversations(response.conversations || []);
+      console.log('📥 Conversations response:', response);
+
+      const conversations =
+        response.data || response.conversations || response || [];
+      console.log('📝 Parsed conversations:', conversations);
+      setConversations(Array.isArray(conversations) ? conversations : []);
     } catch (error) {
       console.error('Failed to load conversations:', error);
     } finally {
@@ -66,80 +77,132 @@ export function ConversationList({
     }
   };
 
-  const searchUsers = async (query: string) => {
+  // Separate search functions for user search and group search
+  const searchUsersForDM = async (query: string) => {
     if (!query.trim()) {
-      setSearchResults([]);
+      setUserSearchResults([]);
       return;
     }
 
-    setSearchLoading(true);
+    setUserSearchLoading(true);
     try {
+      console.log('🔍 Searching for users (DM):', query);
       const response = await usersApi.searchUsers(query.trim());
-      setSearchResults(response.users || []);
+      console.log('📥 Search response:', response);
+
+      let users = [];
+      if (response && response.data) {
+        users = response.data;
+      } else if (Array.isArray(response)) {
+        users = response;
+      }
+
+      console.log('👥 Parsed users:', users);
+      setUserSearchResults(Array.isArray(users) ? users : []);
     } catch (error) {
-      console.error('Failed to search users:', error);
-      setSearchResults([]);
+      console.error('❌ Failed to search users:', error);
+      setUserSearchResults([]);
     } finally {
-      setSearchLoading(false);
+      setUserSearchLoading(false);
+    }
+  };
+
+  const searchUsersForGroup = async (query: string) => {
+    if (!query.trim()) {
+      setGroupSearchResults([]);
+      return;
+    }
+
+    setGroupSearchLoading(true);
+    try {
+      console.log('🔍 Searching for users (Group):', query);
+      const response = await usersApi.searchUsers(query.trim());
+      console.log('📥 Search response:', response);
+
+      let users = [];
+      if (response && response.data) {
+        users = response.data;
+      } else if (Array.isArray(response)) {
+        users = response;
+      }
+
+      console.log('👥 Parsed users:', users);
+      setGroupSearchResults(Array.isArray(users) ? users : []);
+    } catch (error) {
+      console.error('❌ Failed to search users:', error);
+      setGroupSearchResults([]);
+    } finally {
+      setGroupSearchLoading(false);
     }
   };
 
   const startConversation = async (otherUserId: string) => {
     try {
+      console.log('🚀 Starting direct conversation with user:', otherUserId);
       const response = await conversationsApi.createConversation({
         type: 'direct',
         participantIds: [otherUserId],
       });
 
-      const newConversation = response.conversation;
+      console.log('📥 Create conversation response:', response);
+
+      const newConversation =
+        response.data || response.conversation || response;
+      console.log('✅ New conversation:', newConversation);
+
       setConversations(prev => [newConversation, ...prev]);
       setShowUserSearch(false);
-      setSearchQuery('');
-      setSearchResults([]);
+      setUserSearchQuery('');
+      setUserSearchResults([]);
 
       if (onConversationSelect) {
         onConversationSelect(newConversation.id);
       }
     } catch (error) {
-      console.error('Failed to start conversation:', error);
+      console.error('❌ Failed to start conversation:', error);
     }
   };
 
   const createGroupChat = async () => {
+    console.log('🚀 Creating group chat with:', {
+      name: groupName.trim(),
+      selectedUsers,
+      userCount: selectedUsers.length,
+    });
+
     if (!groupName.trim() || selectedUsers.length === 0) {
+      console.log('❌ Validation failed - group name or users missing');
       return;
     }
 
     try {
+      console.log('📤 Sending API request...');
       const response = await conversationsApi.createConversation({
         type: 'group',
         name: groupName.trim(),
         participantIds: selectedUsers,
       });
 
-      const newConversation = response.conversation;
+      console.log('📥 Create group response:', response);
+
+      const newConversation =
+        response.data || response.conversation || response;
+      console.log('✅ New group conversation:', newConversation);
+
       setConversations(prev => [newConversation, ...prev]);
       setShowGroupCreation(false);
       setGroupName('');
       setSelectedUsers([]);
-      setSearchQuery('');
-      setSearchResults([]);
+      setGroupSearchQuery('');
+      setGroupSearchResults([]);
 
       if (onConversationSelect) {
         onConversationSelect(newConversation.id);
       }
     } catch (error) {
-      console.error('Failed to create group chat:', error);
+      console.error('❌ Failed to create group chat:', error);
     }
   };
-
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      searchUsers(searchQuery);
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
 
   const formatLastMessage = (lastMessage: any) => {
     if (!lastMessage) return 'No messages';
@@ -211,7 +274,7 @@ export function ConversationList({
         </div>
       </div>
 
-      {/* User Search */}
+      {/* User Search for Direct Messages */}
       {showUserSearch && (
         <div className='p-4 border-b border-gray-200 bg-gray-50'>
           <div className='relative'>
@@ -222,24 +285,29 @@ export function ConversationList({
             <input
               type='text'
               placeholder='Search users...'
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              value={userSearchQuery}
+              onChange={e => setUserSearchQuery(e.target.value)}
+              onKeyUp={e => {
+                if (e.key === 'Enter') {
+                  searchUsersForDM(userSearchQuery);
+                }
+              }}
               className='w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm'
             />
           </div>
 
-          {searchLoading && (
+          {userSearchLoading && (
             <div className='mt-2 text-center text-sm text-gray-500'>
               Searching...
             </div>
           )}
 
-          {!searchLoading && searchResults.length > 0 && (
+          {!userSearchLoading && userSearchResults.length > 0 && (
             <div className='mt-3 space-y-1'>
               <p className='text-xs text-gray-500 mb-2'>
                 Click to start a conversation:
               </p>
-              {searchResults.map(searchUser => (
+              {userSearchResults.map(searchUser => (
                 <div
                   key={searchUser.id}
                   onClick={() => startConversation(searchUser.id)}
@@ -264,11 +332,13 @@ export function ConversationList({
             </div>
           )}
 
-          {!searchLoading && searchQuery && searchResults.length === 0 && (
-            <div className='mt-3 text-center text-sm text-gray-500'>
-              No users found matching "{searchQuery}"
-            </div>
-          )}
+          {!userSearchLoading &&
+            userSearchQuery &&
+            userSearchResults.length === 0 && (
+              <div className='mt-3 text-center text-sm text-gray-500'>
+                No users found matching "{userSearchQuery}"
+              </div>
+            )}
         </div>
       )}
 
@@ -301,8 +371,13 @@ export function ConversationList({
                 <input
                   type='text'
                   placeholder='Search users to add...'
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
+                  value={groupSearchQuery}
+                  onChange={e => setGroupSearchQuery(e.target.value)}
+                  onKeyUp={e => {
+                    if (e.key === 'Enter') {
+                      searchUsersForGroup(groupSearchQuery);
+                    }
+                  }}
                   className='w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm'
                 />
               </div>
@@ -314,24 +389,25 @@ export function ConversationList({
                 <p className='text-xs text-gray-500'>Selected users:</p>
                 <div className='flex flex-wrap gap-2'>
                   {selectedUsers.map(userId => {
-                    const user = searchResults.find(u => u.id === userId);
+                    const user = groupSearchResults.find(u => u.id === userId);
                     return user ? (
-                      <div
+                      <span
                         key={userId}
                         className='inline-flex items-center bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs'
                       >
                         {user.username}
                         <button
-                          onClick={() =>
+                          type='button'
+                          onClick={() => {
                             setSelectedUsers(prev =>
                               prev.filter(id => id !== userId)
-                            )
-                          }
-                          className='ml-1 text-green-600 hover:text-green-800'
+                            );
+                          }}
+                          className='ml-2 text-green-600 hover:text-green-800'
                         >
                           <X size={12} />
                         </button>
-                      </div>
+                      </span>
                     ) : null;
                   })}
                 </div>
@@ -339,9 +415,15 @@ export function ConversationList({
             )}
 
             {/* Search Results for Group */}
-            {!searchLoading && searchResults.length > 0 && (
+            {groupSearchLoading && (
+              <div className='mt-2 text-center text-sm text-gray-500'>
+                Searching...
+              </div>
+            )}
+
+            {!groupSearchLoading && groupSearchResults.length > 0 && (
               <div className='space-y-1 max-h-32 overflow-y-auto'>
-                {searchResults.map(searchUser => (
+                {groupSearchResults.map(searchUser => (
                   <div
                     key={searchUser.id}
                     onClick={() => {
@@ -391,8 +473,8 @@ export function ConversationList({
                   setShowGroupCreation(false);
                   setGroupName('');
                   setSelectedUsers([]);
-                  setSearchQuery('');
-                  setSearchResults([]);
+                  setGroupSearchQuery('');
+                  setGroupSearchResults([]);
                 }}
                 className='px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm'
               >
@@ -430,12 +512,10 @@ export function ConversationList({
                       <div className='w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center'>
                         <Users size={20} className='text-gray-600' />
                       </div>
-                    ) : conversation.participant &&
-                      Array.isArray(conversation.participant) &&
-                      conversation.participant.length > 0 ? (
-                      <div className='w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-white font-medium'>
-                        {conversation.participant[0]?.username?.toUpperCase() ||
-                          conversation.participant[0]?.username?.toUpperCase()}
+                    ) : conversation.participant ? (
+                      <div className='w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium'>
+                        {conversation.participant.username?.toUpperCase() ||
+                          conversation.participant?.username?.toUpperCase()}
                       </div>
                     ) : (
                       <div className='w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center'>
@@ -512,21 +592,21 @@ export function ConversationList({
                         )}
                       </div>
                     </div>
-
-                    {conversation.lastMessage && (
-                      <div className='mt-1 space-y-1'>
-                        <div className='text-sm text-gray-600 truncate'>
-                          {formatLastMessage(conversation.lastMessage)}
-                        </div>
-                        <div className='text-xs text-gray-400'>
-                          {formatDistanceToNow(
-                            new Date(conversation.lastMessage.createdAt),
-                            { addSuffix: true }
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
+
+                  {conversation.lastMessage && (
+                    <div className='mt-1 space-y-1'>
+                      <div className='text-sm text-gray-600 truncate'>
+                        {formatLastMessage(conversation.lastMessage)}
+                      </div>
+                      <div className='text-xs text-gray-400'>
+                        {formatDistanceToNow(
+                          new Date(conversation.lastMessage.createdAt),
+                          { addSuffix: true }
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

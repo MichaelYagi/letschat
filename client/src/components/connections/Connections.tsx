@@ -396,10 +396,9 @@ export function Connections() {
             {connections.map(connection => {
               // Determine which user is the friend (not the current user)
               const friendUser =
-                connection.user ||
-                (connection.requesterId === user?.id
+                connection.requesterId === user?.id
                   ? connection.addresseeProfile
-                  : connection.requesterProfile);
+                  : connection.requesterProfile;
               const friendId =
                 friendUser?.id ||
                 (connection.requesterId === user?.id
