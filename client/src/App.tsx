@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -30,6 +30,16 @@ function App() {
 
 function AppContent() {
   const { user, isLoading } = useAuth();
+  const [showNotificationSettings, setShowNotificationSettings] =
+    useState(false);
+
+  const handleOpenNotificationSettings = () => {
+    setShowNotificationSettings(true);
+  };
+
+  const handleCloseNotificationSettings = () => {
+    setShowNotificationSettings(false);
+  };
 
   if (isLoading) {
     return (
@@ -46,7 +56,11 @@ function AppContent() {
     <Router>
       <div className='min-h-screen bg-gray-50'>
         {user ? (
-          <MainLayout>
+          <MainLayout
+            showNotificationSettings={showNotificationSettings}
+            setShowNotificationSettings={setShowNotificationSettings}
+            onOpenNotificationSettings={handleOpenNotificationSettings}
+          >
             <Routes>
               <Route path='/' element={<ConversationListWrapper />} />
               <Route path='/chat/:conversationId' element={<ChatPage />} />
@@ -54,7 +68,15 @@ function AppContent() {
               <Route path='/profile' element={<UserProfile />} />
               <Route
                 path='/settings'
-                element={<NotificationSettings onClose={() => {}} />}
+                element={
+                  showNotificationSettings ? (
+                    <NotificationSettings
+                      onClose={() => setShowNotificationSettings(false)}
+                    />
+                  ) : (
+                    <Navigate to='/' replace />
+                  )
+                }
               />
               <Route path='*' element={<Navigate to='/' replace />} />
             </Routes>

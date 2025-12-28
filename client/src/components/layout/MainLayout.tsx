@@ -3,13 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { LogOut, User, Settings, MessageCircle, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { NotificationCenter } from '../notifications/NotificationCenter';
+import { NotificationSettings } from '../NotificationSettings';
 
 interface MainLayoutProps {
   children: React.ReactNode;
   title?: string;
+  showNotificationSettings?: boolean;
+  setShowNotificationSettings?: (show: boolean) => void;
+  onOpenNotificationSettings?: () => void;
 }
 
-export function MainLayout({ children, title }: MainLayoutProps) {
+export function MainLayout({
+  children,
+  title,
+  showNotificationSettings,
+  setShowNotificationSettings,
+  onOpenNotificationSettings,
+}: MainLayoutProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -23,7 +33,7 @@ export function MainLayout({ children, title }: MainLayoutProps) {
   };
 
   const goToSettings = () => {
-    navigate('/settings');
+    onOpenNotificationSettings?.();
   };
 
   const goToFavorites = () => {
@@ -83,6 +93,13 @@ export function MainLayout({ children, title }: MainLayoutProps) {
             >
               <Settings size={20} />
             </button>
+
+            {/* Notification Settings Modal */}
+            {showNotificationSettings && (
+              <NotificationSettings
+                onClose={() => setShowNotificationSettings?.(false)}
+              />
+            )}
 
             <button
               onClick={handleLogout}
