@@ -351,6 +351,13 @@ app.post('/api/conversations', (req, res) => {
     }
   }
 
+  // For group conversations, require at least 2 other participants
+  if (type === 'group' && participantIds.length < 2) {
+    return res
+      .status(400)
+      .json({ error: 'Group conversations require at least 2 participants' });
+  }
+
   const conversation = {
     id: nextConversationId++,
     type,

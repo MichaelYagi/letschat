@@ -57,13 +57,20 @@ export class MessageRepository {
     before?: Date
   ): Promise<Message[]> {
     let query = db('messages')
-      .where('conversation_id', conversationId)
-      .whereNull('deleted_at')
-      .orderBy('created_at', 'desc')
+      .join('users', 'messages.sender_id', 'users.id')
+      .where('messages.conversation_id', conversationId)
+      .whereNull('messages.deleted_at')
+      .select(
+        'messages.*',
+        'users.username as sender_username',
+        'users.display_name as sender_display_name',
+        'users.email as sender_email'
+      )
+      .orderBy('messages.created_at', 'desc')
       .limit(limit);
 
     if (before) {
-      query = query.andWhere('created_at', '<', before);
+      query = query.andWhere('messages.created_at', '<', before);
     }
 
     const messages = await query;
@@ -160,6 +167,12 @@ export class MessageRepository {
         ? new Date(dbMessage.deleted_at)
         : undefined,
       createdAt: new Date(dbMessage.created_at),
+      sender: {
+        id: dbMessage.sender_id,
+        username: dbMessage.sender_username,
+        displayName: dbMessage.sender_display_name || dbMessage.sender_username,
+        email: dbMessage.sender_email,
+      },
     };
   }
 }
@@ -250,7 +263,50 @@ export class ConversationRepository {
       .select('conversations.*')
       .orderBy('conversations.updated_at', 'desc');
 
-    return conversations.map(this.mapDbConversationToConversation);
+    // For each conversation, get participants with user details
+    const conversationsWithParticipants = await Promise.all(
+      conversations.map(async conv => {
+        const participants = await db('conversation_participants')
+          .join('users', 'conversation_participants.user_id', 'users.id')
+          .where('conversation_participants.conversation_id', conv.id)
+          .select(
+            'conversation_participants.*',
+            'users.username',
+            'users.display_name',
+            'users.email'
+          );
+
+        // Set conversation name for direct messages
+        let conversationName = conv.name;
+        if (conv.type === 'direct' && !conversationName) {
+          const otherParticipant = participants.find(p => p.user_id !== userId);
+          if (otherParticipant) {
+            conversationName =
+              otherParticipant.display_name || otherParticipant.username;
+          }
+        }
+
+        return {
+          ...conv,
+          name: conversationName,
+          participants: participants.map(p => ({
+            id: p.id,
+            conversationId: p.conversation_id,
+            userId: p.user_id,
+            username: p.username,
+            displayName: p.display_name || p.username,
+            email: p.email,
+            role: p.role,
+            joinedAt: new Date(p.joined_at),
+            lastReadAt: new Date(p.last_read_at),
+          })),
+        };
+      })
+    );
+
+    return conversationsWithParticipants.map(
+      this.mapDbConversationToConversation
+    );
   }
 
   /**
@@ -341,6 +397,7 @@ export class ConversationRepository {
       avatarUrl: dbConversation.avatar_url,
       createdBy: dbConversation.created_by,
       encryptionKey: dbConversation.encryption_key,
+      participants: dbConversation.participants || [],
       createdAt: new Date(dbConversation.created_at),
       updatedAt: new Date(dbConversation.updated_at),
     };

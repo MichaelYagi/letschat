@@ -39,12 +39,14 @@ export function ChatPage({ conversationName }: ChatPageProps) {
   const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(
     null
   );
+  const [conversationDetails, setConversationDetails] = useState<any>(null);
 
   useEffect(() => {
     if (connected && conversationId) {
       joinConversation(conversationId);
       setIsLoading(false);
       markConversationAsRead();
+      loadConversationDetails();
     }
   }, [connected, conversationId]);
 
@@ -59,13 +61,13 @@ export function ChatPage({ conversationName }: ChatPageProps) {
       addNotification({
         id: Date.now(),
         type: 'message',
-        title: `New message from ${conversationName}`,
+        title: `New message from ${getConversationDisplay()}`,
         content: lastMessage.content,
         timestamp: new Date(),
       });
       playNotificationSound();
     }
-  }, [messages, user?.id, conversationName]);
+  }, [messages, user?.id, conversationDetails]);
 
   const handleSendMessage = (content: string) => {
     if (conversationId) {
@@ -132,6 +134,87 @@ export function ChatPage({ conversationName }: ChatPageProps) {
     }
   };
 
+  const loadConversationDetails = async () => {
+    if (!conversationId) return;
+
+    try {
+      const response = await api.get(`/conversations`);
+      const conversations = response.data;
+      const currentConv = conversations.find(
+        (c: any) => c.id === conversationId
+      );
+
+      if (currentConv) {
+        setConversationDetails(currentConv);
+      }
+    } catch (error) {
+      console.error('Error loading conversation details:', error);
+    }
+  };
+
+  const getConversationDisplay = () => {
+    if (!conversationDetails && conversationId) {
+      return `Conversation ${conversationId.slice(0, 8)}`;
+    }
+
+    if (!conversationDetails) return 'Chat';
+
+    if (
+      conversationDetails.type === 'direct' &&
+      conversationDetails.participants
+    ) {
+      const otherParticipant = conversationDetails.participants.find(
+        (p: any) => p.id !== user?.id
+      );
+      return otherParticipant ? otherParticipant.displayName : 'Unknown User';
+    }
+
+    if (conversationDetails.type === 'group') {
+      return conversationDetails.name || 'Group Chat';
+    }
+
+    return conversationDetails.name || 'Chat';
+  };
+
+  const getParticipantDisplay = () => {
+    if (!conversationDetails || !conversationDetails.participants) return null;
+
+    const otherParticipants = conversationDetails.participants.filter(
+      (p: any) => p.id !== user?.id
+    );
+
+    if (otherParticipants.length === 0) return null;
+
+    if (conversationDetails.type === 'direct') {
+      return (
+        <p className='text-xs text-gray-400'>
+          Chat with {otherParticipants[0].displayName}
+        </p>
+      );
+    }
+
+    if (conversationDetails.type === 'group') {
+      const participantNames = otherParticipants
+        .map((p: any) => p.displayName)
+        .join(', ');
+      return (
+        <p className='text-xs text-gray-400'>Group with {participantNames}</p>
+      );
+    }
+
+    return null;
+  };
+
+  const getConnectionStatus = () => {
+    // If we have conversation details and messages, we're connected
+    if (conversationDetails || messages.length > 0) {
+      return 'Connected';
+    }
+
+    // Show actual connection status from WebSocket
+    return connected ? 'Connected' : 'Connecting...';
+  };
+
   return (
     <div className='flex flex-col h-full'>
       {/* Chat Header */}
@@ -143,14 +226,10 @@ export function ChatPage({ conversationName }: ChatPageProps) {
             </div>
             <div>
               <h2 className='text-lg font-semibold text-gray-900'>
-                {conversationName ||
-                  (conversationId &&
-                    `Conversation ${conversationId.slice(0, 8)}`) ||
-                  'Chat'}
+                {conversationName || getConversationDisplay()}
               </h2>
-              <p className='text-sm text-gray-500'>
-                {connected ? 'Connected' : 'Connecting...'}
-              </p>
+              <p className='text-sm text-gray-500'>{getConnectionStatus()}</p>
+              {getParticipantDisplay()}
             </div>
           </div>
 

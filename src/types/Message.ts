@@ -27,6 +27,12 @@ export interface Message {
   deletedAt?: Date;
   reactions?: MessageReactionSummary[];
   createdAt: Date;
+  sender?: {
+    id: string;
+    username: string;
+    displayName: string;
+    email: string;
+  };
 }
 
 export interface CreateMessageRequest {
@@ -63,6 +69,7 @@ export interface Conversation {
   avatarUrl?: string;
   createdBy: string;
   encryptionKey: string;
+  participants?: ConversationParticipant[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -80,6 +87,9 @@ export interface ConversationParticipant {
   id: string;
   conversationId: string;
   userId: string;
+  username?: string;
+  displayName?: string;
+  email?: string;
   role: 'admin' | 'member';
   joinedAt: Date;
   lastReadAt: Date;

@@ -154,6 +154,46 @@ export class WebSocketService {
         `User ${socket.username} joined conversation ${conversationId}`
       );
 
+      // Load and send conversation history
+      const messages = await MessageService.getMessages(
+        conversationId,
+        socket.userId!,
+        50 // Get last 50 messages
+      );
+
+      // Transform messages to match frontend format
+      const transformedMessages = messages.map(msg => ({
+        id: msg.id,
+        conversationId: msg.conversationId,
+        senderId: msg.senderId,
+        sender: msg.sender
+          ? {
+              id: msg.sender.id,
+              username: msg.sender.username,
+              displayName: msg.sender.displayName,
+              avatarUrl: null,
+            }
+          : {
+              id: msg.senderId,
+              username: 'Unknown',
+              displayName: 'Unknown',
+              avatarUrl: null,
+            },
+        content: msg.content || '[Encrypted Message]',
+        contentType: msg.contentType,
+        timestamp: msg.createdAt.toISOString(),
+        isOwn: msg.senderId === socket.userId,
+        isEdited: !!msg.editedAt,
+        isDeleted: !!msg.deletedAt,
+        deliveryStatus: 'sent' as const,
+      }));
+
+      // Send message history to the client
+      socket.emit('conversation_history', {
+        conversationId,
+        messages: transformedMessages,
+      });
+
       socket.emit('joined_conversation', { conversationId });
     } catch (error) {
       logger.error('Error joining conversation:', error);

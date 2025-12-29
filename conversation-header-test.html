@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Conversation Header Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .conversation-header {
+        background: white;
+        padding: 15px;
+        margin: 20px 0;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border-bottom: 1px solid #e5e5e5;
+      }
+      .user-avatar {
+        width: 40px;
+        height: 40px;
+        background: #007bff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        margin-right: 12px;
+      }
+      .header-info {
+        display: flex;
+        align-items: center;
+      }
+      .header-text {
+        flex: 1;
+      }
+      .conversation-name {
+        font-size: 18px;
+        font-weight: 600;
+        color: #1a1a1a;
+        margin: 0;
+      }
+      .participant-info {
+        font-size: 12px;
+        color: #6b7280;
+        margin: 4px 0 0 0;
+      }
+      .connection-status {
+        font-size: 14px;
+        color: #6b7280;
+        margin: 4px 0 0 0;
+      }
+      .status-connected {
+        color: #10b981;
+      }
+      .status-connecting {
+        color: #f59e0b;
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      input {
+        padding: 8px;
+        margin: 5px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🧪 Conversation Header Test</h1>
+
+    <div>
+      <h3>Select User ID:</h3>
+      <button onclick="setUserId(100)">Amy (ID: 100)</button>
+      <button onclick="setUserId(101)">Ben (ID: 101)</button>
+      <button onclick="setUserId(2)">Alice (ID: 2)</button>
+      <div
+        id="current-user"
+        style="
+          margin: 10px 0;
+          padding: 10px;
+          background: #e3f2fd;
+          border-radius: 4px;
+        "
+      >
+        Current User ID: <strong>100</strong>
+      </div>
+    </div>
+
+    <div>
+      <h3>Test Conversation:</h3>
+      <input
+        type="text"
+        id="conversationId"
+        placeholder="Conversation ID"
+        value="4"
+      />
+      <button onclick="testConversation()">Load Conversation</button>
+    </div>
+
+    <div
+      id="conversation-header"
+      class="conversation-header"
+      style="display: none"
+    >
+      <div class="header-info">
+        <div class="user-avatar" id="user-avatar">A</div>
+        <div class="header-text">
+          <h3 class="conversation-name" id="conversation-name">Loading...</h3>
+          <p class="participant-info" id="participant-info">
+            Loading participants...
+          </p>
+          <p class="connection-status" id="connection-status">
+            Checking status...
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = '/api';
+      let currentUserId = 100;
+
+      function setUserId(userId) {
+        currentUserId = userId;
+        document.getElementById('current-user').innerHTML =
+          `Current User ID: <strong>${userId}</strong>`;
+      }
+
+      async function testConversation() {
+        const conversationId = document.getElementById('conversationId').value;
+        if (!conversationId) return;
+
+        try {
+          // Get conversations for current user
+          const response = await fetch(`${API_BASE}/conversations`, {
+            headers: { 'X-User-ID': currentUserId },
+          });
+          const conversations = await response.json();
+
+          // Find the specific conversation
+          const conversation = conversations.find(
+            c => c.id === parseInt(conversationId)
+          );
+
+          if (conversation) {
+            displayConversationHeader(conversation);
+          } else {
+            displayError('Conversation not found');
+          }
+        } catch (error) {
+          displayError('Error loading conversation: ' + error.message);
+        }
+      }
+
+      function displayConversationHeader(conversation) {
+        const headerDiv = document.getElementById('conversation-header');
+        const nameElement = document.getElementById('conversation-name');
+        const participantElement = document.getElementById('participant-info');
+        const statusElement = document.getElementById('connection-status');
+        const avatarElement = document.getElementById('user-avatar');
+
+        // Set conversation name
+        if (conversation.type === 'direct') {
+          const otherParticipant = conversation.participants.find(
+            p => p.id !== currentUserId
+          );
+          nameElement.textContent = otherParticipant
+            ? otherParticipant.displayName
+            : 'Unknown User';
+          participantElement.textContent = `Chat with ${otherParticipant ? otherParticipant.displayName : 'Unknown User'}`;
+          avatarElement.textContent = otherParticipant
+            ? otherParticipant.displayName.charAt(0).toUpperCase()
+            : '?';
+        } else if (conversation.type === 'group') {
+          nameElement.textContent = conversation.name || 'Group Chat';
+          const otherParticipants = conversation.participants.filter(
+            p => p.id !== currentUserId
+          );
+          const participantNames = otherParticipants
+            .map(p => p.displayName)
+            .join(', ');
+          participantElement.textContent = `Group with ${participantNames}`;
+          avatarElement.textContent = conversation.name
+            ? conversation.name.charAt(0).toUpperCase()
+            : 'G';
+        }
+
+        // Set connection status (we have conversation details, so we're connected)
+        statusElement.textContent = 'Connected';
+        statusElement.className = 'connection-status status-connected';
+
+        // Show header
+        headerDiv.style.display = 'block';
+      }
+
+      function displayError(message) {
+        const headerDiv = document.getElementById('conversation-header');
+        const nameElement = document.getElementById('conversation-name');
+        const participantElement = document.getElementById('participant-info');
+        const statusElement = document.getElementById('connection-status');
+
+        nameElement.textContent = 'Error';
+        participantElement.textContent = message;
+        statusElement.textContent = 'Connection Failed';
+        statusElement.className = 'connection-status status-connecting';
+
+        headerDiv.style.display = 'block';
+      }
+
+      // Auto-load on page load
+      window.onload = () => {
+        testConversation();
+      };
+    </script>
+  </body>
+</html>

@@ -16,16 +16,19 @@ import { useCalling } from '../../hooks/useCalling';
 interface Conversation {
   id: string;
   type: 'direct' | 'group';
-  name: string | null;
-  participant?: {
+  name?: string;
+  participants?: Array<{
+    id: string;
     username: string;
-    status: string;
-  } | null;
+    displayName: string;
+  }>;
   lastMessage?: {
+    id: string;
     content: string;
     senderId: string;
     createdAt: string;
-  } | null;
+    contentType?: string;
+  };
   unreadCount: number;
 }
 
@@ -139,6 +142,26 @@ export function ConversationList({
   const startConversation = async (otherUserId: string) => {
     try {
       console.log('🚀 Starting direct conversation with user:', otherUserId);
+
+      // First, check if conversation already exists in local state
+      const existingConversation = conversations.find(
+        conv =>
+          conv.type === 'direct' &&
+          conv.participants?.some(p => p.id === otherUserId)
+      );
+
+      if (existingConversation) {
+        console.log('📋 Found existing conversation:', existingConversation.id);
+        setShowUserSearch(false);
+        setUserSearchQuery('');
+        setUserSearchResults([]);
+        if (onConversationSelect) {
+          onConversationSelect(existingConversation.id);
+        }
+        return;
+      }
+
+      console.log('🆕 Creating new conversation...');
       const response = await conversationsApi.createConversation({
         type: 'direct',
         participantIds: [otherUserId],
@@ -150,7 +173,9 @@ export function ConversationList({
         response.data || response.conversation || response;
       console.log('✅ New conversation:', newConversation);
 
-      setConversations(prev => [newConversation, ...prev]);
+      // Refresh conversations list to ensure we have the latest data
+      await loadConversations();
+
       setShowUserSearch(false);
       setUserSearchQuery('');
       setUserSearchResults([]);
@@ -225,11 +250,24 @@ export function ConversationList({
     return `${senderName}: ${content}`;
   };
 
+  const getOtherParticipant = (conversation: Conversation) => {
+    if (!conversation.participants || conversation.participants.length < 2) {
+      return null;
+    }
+    return conversation.participants.find(p => p.id !== user?.id) || null;
+  };
+
   const getConversationName = (conversation: Conversation) => {
     if (conversation.type === 'group') {
       return conversation.name || 'Unnamed Group';
-    } else if (conversation.participant) {
-      return conversation.participant.username;
+    } else if (conversation.type === 'direct') {
+      // Backend should now set the name to the other participant's display name
+      if (conversation.name) {
+        return conversation.name;
+      }
+      // Fallback: find the other participant
+      const otherParticipant = getOtherParticipant(conversation);
+      return otherParticipant ? otherParticipant.displayName : 'Unknown User';
     }
     return 'Unknown';
   };
@@ -512,15 +550,22 @@ export function ConversationList({
                       <div className='w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center'>
                         <Users size={20} className='text-gray-600' />
                       </div>
-                    ) : conversation.participant ? (
-                      <div className='w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium'>
-                        {conversation.participant.username?.toUpperCase() ||
-                          conversation.participant?.username?.toUpperCase()}
-                      </div>
                     ) : (
-                      <div className='w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center'>
-                        <span className='text-gray-600'>?</span>
-                      </div>
+                      (() => {
+                        const otherParticipant =
+                          getOtherParticipant(conversation);
+                        return otherParticipant ? (
+                          <div className='w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium'>
+                            {otherParticipant.username
+                              ?.charAt(0)
+                              ?.toUpperCase() || '?'}
+                          </div>
+                        ) : (
+                          <div className='w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center'>
+                            <span className='text-gray-600'>?</span>
+                          </div>
+                        );
+                      })()
                     )}
                   </div>
 
@@ -532,18 +577,13 @@ export function ConversationList({
                           {getConversationName(conversation)}
                         </h3>
                         {conversation.type === 'direct' &&
-                          conversation.participant && (
+                          getOtherParticipant(conversation) && (
                             <div className='flex items-center'>
                               {getStatusIndicator(
-                                conversation.participant.status
+                                'online' // Default status since we don't have real-time status in this component
                               )}
                               <span className='ml-1 text-xs text-gray-500'>
-                                {conversation.participant.status === 'online'
-                                  ? ''
-                                  : conversation.participant.status ===
-                                      'offline'
-                                    ? 'offline'
-                                    : 'away'}
+                                online
                               </span>
                             </div>
                           )}
@@ -551,16 +591,16 @@ export function ConversationList({
                       <div className='flex items-center space-x-2'>
                         {/* Calling buttons for direct messages */}
                         {conversation.type === 'direct' &&
-                          conversation.participant && (
+                          getOtherParticipant(conversation) && (
                             <div className='flex space-x-1'>
                               <button
                                 onClick={e => {
                                   e.stopPropagation();
-                                  const username =
-                                    typeof conversation.participant === 'string'
-                                      ? conversation.participant
-                                      : conversation.participant?.username ||
-                                        'Unknown';
+                                  const otherParticipant =
+                                    getOtherParticipant(conversation);
+                                  const username = otherParticipant
+                                    ? otherParticipant.username
+                                    : 'Unknown';
                                   startCall(conversation.id, username, 'voice');
                                 }}
                                 className='p-1 text-green-600 hover:bg-green-50 rounded-full transition-colors'
@@ -571,11 +611,11 @@ export function ConversationList({
                               <button
                                 onClick={e => {
                                   e.stopPropagation();
-                                  const username =
-                                    typeof conversation.participant === 'string'
-                                      ? conversation.participant
-                                      : conversation.participant?.username ||
-                                        'Unknown';
+                                  const otherParticipant =
+                                    getOtherParticipant(conversation);
+                                  const username = otherParticipant
+                                    ? otherParticipant.username
+                                    : 'Unknown';
                                   startCall(conversation.id, username, 'video');
                                 }}
                                 className='p-1 text-purple-600 hover:bg-purple-50 rounded-full transition-colors'

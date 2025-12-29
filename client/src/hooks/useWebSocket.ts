@@ -59,6 +59,30 @@ export function useWebSocket(): UseWebSocketReturn {
       setConnected(false);
     });
 
+    newSocket.on(
+      'conversation_history',
+      (data: { conversationId: string; messages: Message[] }) => {
+        console.log(
+          '📚 Loading conversation history for:',
+          data.conversationId,
+          data.messages.length,
+          'messages'
+        );
+        setMessages(prev => {
+          // Remove any existing messages from this conversation first
+          const filtered = prev.filter(
+            m => m.conversationId !== data.conversationId
+          );
+          // Add the new history and sort by timestamp
+          const updated = [...filtered, ...data.messages];
+          return updated.sort(
+            (a, b) =>
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          );
+        });
+      }
+    );
+
     newSocket.on('new_message', (message: Message) => {
       setMessages(prev => {
         // Check if message already exists to avoid duplicates

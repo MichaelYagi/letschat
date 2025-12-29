@@ -111,9 +111,9 @@ export class ConversationRepository {
   }
 
   /**
-   * Get conversations by user ID
+   * Get conversations for a user
    */
-  static async getByUserId(userId: string): Promise<Conversation[]> {
+  static async getByUserId(userId: string): Promise<any[]> {
     const conversations = await db('conversations')
       .select('conversations.*')
       .join(
@@ -124,17 +124,86 @@ export class ConversationRepository {
       .where('conversation_participants.user_id', userId)
       .orderBy('conversations.updated_at', 'desc');
 
-    return conversations.map(conv => ({
-      id: conv.id,
-      type: conv.type,
-      name: conv.name,
-      description: conv.description,
-      avatarUrl: conv.avatar_url,
-      createdBy: conv.created_by,
-      encryptionKey: conv.encryption_key,
-      createdAt: conv.created_at,
-      updatedAt: conv.updated_at,
-    }));
+    // For each conversation, get participants and last message
+    const conversationsWithDetails = await Promise.all(
+      conversations.map(async conv => {
+        // Get participants with user details
+        const participants = await db('conversation_participants')
+          .where('conversation_id', conv.id)
+          .join('users', 'conversation_participants.user_id', 'users.id')
+          .select(
+            'users.id',
+            'users.username',
+            'users.display_name',
+            'conversation_participants.role'
+          );
+
+        // Get last message
+        const lastMessage = await db('messages')
+          .where('conversation_id', conv.id)
+          .join('users', 'messages.sender_id', 'users.id')
+          .select(
+            'messages.id',
+            'messages.content',
+            'messages.encrypted_content',
+            'messages.sender_id',
+            'messages.created_at',
+            'messages.content_type'
+          )
+          .orderBy('messages.created_at', 'desc')
+          .first();
+
+        // Get unread count
+        const unreadCount = await db('messages')
+          .where('conversation_id', conv.id)
+          .where('sender_id', '!=', userId)
+          .whereRaw(
+            'messages.created_at > COALESCE((SELECT last_read_at FROM conversation_participants WHERE conversation_id = ? AND user_id = ?), ?)',
+            [conv.id, userId, new Date(0)]
+          )
+          .count('* as count')
+          .first();
+
+        // For direct conversations, set name to other participant's display name if not already set
+        let conversationName = conv.name;
+        if (conv.type === 'direct' && !conv.name) {
+          const otherParticipant = participants.find(p => p.id !== userId);
+          if (otherParticipant) {
+            conversationName =
+              otherParticipant.display_name || otherParticipant.username;
+          }
+        }
+
+        return {
+          id: conv.id,
+          type: conv.type,
+          name: conversationName,
+          description: conv.description,
+          avatarUrl: conv.avatar_url,
+          createdBy: conv.created_by,
+          encryptionKey: conv.encryption_key,
+          createdAt: conv.created_at,
+          updatedAt: conv.updated_at,
+          participants: participants.map(p => ({
+            id: p.id,
+            username: p.username,
+            displayName: p.display_name || p.username,
+          })),
+          lastMessage: lastMessage
+            ? {
+                id: lastMessage.id,
+                content: lastMessage.content || '[Encrypted Message]',
+                senderId: lastMessage.sender_id,
+                createdAt: lastMessage.created_at,
+                contentType: lastMessage.content_type || 'text',
+              }
+            : null,
+          unreadCount: parseInt(String(unreadCount?.count || '0')),
+        };
+      })
+    );
+
+    return conversationsWithDetails;
   }
 
   /**

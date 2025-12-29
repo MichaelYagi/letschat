@@ -395,7 +395,10 @@ export class MessageService {
 
     return (
       conversations.find(conv => {
-        return conv.type === 'direct';
+        if (conv.type !== 'direct') return false;
+
+        // Check if user2 is a participant in this conversation
+        return conv.participants?.some(p => p.userId === user2Id);
       }) || null
     );
   }
