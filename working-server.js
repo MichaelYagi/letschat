@@ -32,113 +32,411 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+// In-memory storage
+let users = [];
+let conversations = [];
+let connections = [];
+let messages = [];
+let nextUserId = 100;
+let nextConversationId = 1;
+let nextMessageId = 1;
+
+// Helper functions
+const findUser = username => users.find(u => u.username === username);
+const findUserById = id => users.find(u => u.id === parseInt(id));
+const findConversation = id => conversations.find(c => c.id === parseInt(id));
+const getConnection = (userId1, userId2) =>
+  connections.find(
+    c =>
+      (c.fromUserId === userId1 && c.toUserId === userId2) ||
+      (c.fromUserId === userId2 && c.toUserId === userId1)
+  );
+
 // Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Mock auth endpoints
+// Auth endpoints
+app.post('/api/auth/register', (req, res) => {
+  try {
+    const { username, password, displayName } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password required' });
+    }
+
+    if (findUser(username)) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+
+    const hashedPassword = 'hashed-' + password;
+    const user = {
+      id: nextUserId++,
+      username,
+      displayName: displayName || username,
+      password: hashedPassword,
+      createdAt: new Date().toISOString(),
+    };
+
+    users.push(user);
+
+    res.json({
+      success: true,
+      token: 'mock-jwt-token',
+      user: { id: user.id, username, displayName: user.displayName },
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
 app.post('/api/auth/login', (req, res) => {
-  res.json({
-    success: true,
-    data: {
-      user: { id: '1', username: 'testuser', email: 'test@example.com' },
-      token: 'mock-token-123',
-    },
-  });
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password required' });
+    }
+
+    let user = findUser(username);
+
+    // Create default user if not exists
+    if (!user) {
+      const hashedPassword = 'hashed-' + password;
+      user = {
+        id: nextUserId++,
+        username,
+        displayName: username,
+        password: hashedPassword,
+        createdAt: new Date().toISOString(),
+      };
+      users.push(user);
+    }
+
+    const validPassword = user.password === 'hashed-' + password;
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    res.json({
+      success: true,
+      token: 'mock-jwt-token',
+      user: { id: user.id, username, displayName: user.displayName },
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
 });
 
-app.get('/api/auth/search', (req, res) => {
-  const { q, limit = 10 } = req.query;
-  res.json({
-    success: true,
-    data: [
-      { id: '1', username: `${q}user1`, email: 'user1@example.com' },
-      { id: '2', username: `${q}user2`, email: 'user2@example.com' },
-    ].slice(0, parseInt(limit)),
-  });
+// User search
+app.get('/api/users/search', (req, res) => {
+  const query = req.query.q;
+  if (!query) {
+    return res.json([]);
+  }
+
+  // Add some default users if none exist
+  if (users.length <= 1) {
+    users.push(
+      { id: 2, username: 'alice', displayName: 'Alice' },
+      { id: 3, username: 'bob', displayName: 'Bob' },
+      { id: 4, username: 'charlie', displayName: 'Charlie' }
+    );
+  }
+
+  const results = users
+    .filter(
+      u =>
+        u.username.toLowerCase().includes(query.toLowerCase()) ||
+        u.displayName.toLowerCase().includes(query.toLowerCase())
+    )
+    .map(u => ({ id: u.id, username: u.username, displayName: u.displayName }));
+
+  res.json(results);
 });
 
-app.post('/api/v1/connections/request', (req, res) => {
-  res.json({
-    success: true,
-    data: { id: 'req-1', status: 'pending' },
-  });
-});
+// Helper to get current user ID from header or default to 1
+function getCurrentUserId(req) {
+  // In a real app, this would come from JWT token
+  // For testing, we'll use a header or default to 1
+  return parseInt(req.headers['x-user-id']) || 1;
+}
 
-app.get('/api/v1/connections', (req, res) => {
-  res.json({
-    success: true,
-    data: [],
-  });
-});
+// Connection endpoints
+app.get('/api/connections', (req, res) => {
+  const currentUserId = getCurrentUserId(req); // Mock current user ID
 
-// Message history endpoint
-app.get('/api/v1/conversations/:conversationId/messages', (req, res) => {
-  const { conversationId } = req.params;
-  res.json({
-    success: true,
-    data: [
-      {
-        id: 'msg-1',
-        conversationId,
-        senderId: '1',
-        sender: {
-          id: '1',
-          username: 'alice',
-          displayName: 'Alice',
+  const userConnections = connections.filter(
+    c => c.fromUserId === currentUserId || c.toUserId === currentUserId
+  );
+
+  const result = userConnections
+    .map(c => {
+      const otherUserId =
+        c.fromUserId === currentUserId ? c.toUserId : c.fromUserId;
+      const otherUser = findUserById(otherUserId);
+
+      if (!otherUser) return null;
+
+      return {
+        id: c.id,
+        user: {
+          id: otherUser.id,
+          username: otherUser.username,
+          displayName: otherUser.displayName,
         },
-        content: 'Hello! This is a historical message.',
-        contentType: 'text',
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-        isRead: true,
-        isOwn: false,
-      },
-      {
-        id: 'msg-2',
-        conversationId,
-        senderId: '2',
-        sender: {
-          id: '2',
-          username: 'bob',
-          displayName: 'Bob',
-        },
-        content: 'This is another message from the past.',
-        contentType: 'text',
-        timestamp: new Date(Date.now() - 1800000).toISOString(),
-        isRead: false,
-        isOwn: false,
-      },
-    ],
-  });
+        status: c.status,
+        direction: c.fromUserId === currentUserId ? 'sent' : 'received',
+        createdAt: c.createdAt,
+      };
+    })
+    .filter(Boolean);
+
+  res.json(result);
 });
 
-// Message sending endpoint
-app.post('/api/v1/conversations/:conversationId/messages', (req, res) => {
-  const { conversationId } = req.params;
-  const { content, replyToId } = req.body;
+app.get('/api/connections/pending', (req, res) => {
+  const currentUserId = getCurrentUserId(req); // Mock current user ID
 
-  const newMessage = {
-    id: `msg-${Date.now()}`,
-    conversationId,
-    senderId: '1',
-    sender: {
-      id: '1',
-      username: 'testuser',
-      displayName: 'Test User',
-    },
-    content,
-    contentType: 'text',
-    timestamp: new Date().toISOString(),
-    isRead: false,
-    isOwn: true,
-    replyToId,
+  const pendingConnections = connections.filter(
+    c => c.toUserId === currentUserId && c.status === 'pending'
+  );
+
+  const result = pendingConnections
+    .map(c => {
+      const fromUser = findUserById(c.fromUserId);
+
+      return fromUser
+        ? {
+            id: c.id,
+            user: {
+              id: fromUser.id,
+              username: fromUser.username,
+              displayName: fromUser.displayName,
+            },
+            createdAt: c.createdAt,
+          }
+        : null;
+    })
+    .filter(Boolean);
+
+  res.json(result);
+});
+
+app.post('/api/connections/request', (req, res) => {
+  const { username } = req.body;
+  const currentUserId = getCurrentUserId(req); // Mock current user ID
+
+  if (!username) {
+    return res.status(400).json({ error: 'Username required' });
+  }
+
+  const targetUser = findUser(username);
+  if (!targetUser) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  if (targetUser.id === currentUserId) {
+    return res.status(400).json({ error: 'Cannot connect to yourself' });
+  }
+
+  const existingConnection = getConnection(currentUserId, targetUser.id);
+  if (existingConnection) {
+    return res.status(400).json({ error: 'Connection already exists' });
+  }
+
+  const connection = {
+    id: connections.length + 1,
+    fromUserId: currentUserId,
+    toUserId: targetUser.id,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
   };
 
-  res.json({
-    success: true,
-    data: newMessage,
+  connections.push(connection);
+
+  // Notify via WebSocket
+  io.emit('connection-request', {
+    fromUserId: currentUserId,
+    toUserId: targetUser.id,
+    connection,
   });
+
+  res.json({ success: true });
+});
+
+app.post('/api/connections/:id/accept', (req, res) => {
+  const connectionId = parseInt(req.params.id);
+  const currentUserId = getCurrentUserId(req); // Mock current user ID
+
+  const connection = connections.find(
+    c =>
+      c.id === connectionId &&
+      c.toUserId === currentUserId &&
+      c.status === 'pending'
+  );
+
+  if (!connection) {
+    return res.status(404).json({ error: 'Connection request not found' });
+  }
+
+  connection.status = 'accepted';
+  connection.updatedAt = new Date().toISOString();
+
+  // Notify via WebSocket
+  io.emit('connection-accepted', { connection });
+
+  res.json({ success: true });
+});
+
+// Conversation endpoints
+app.get('/api/conversations', (req, res) => {
+  const currentUserId = getCurrentUserId(req); // Mock current user ID
+
+  const userConversations = conversations.filter(c =>
+    c.participants.some(p => p.id === currentUserId)
+  );
+
+  const result = userConversations.map(c => {
+    const otherParticipant = c.participants.find(p => p.id !== currentUserId);
+    const lastMessage = messages
+      .filter(m => m.conversationId === c.id)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+
+    return {
+      id: c.id,
+      type: c.type,
+      name:
+        c.type === 'direct'
+          ? otherParticipant?.displayName || 'Unknown'
+          : c.name,
+      participants: c.participants,
+      lastMessage: lastMessage
+        ? {
+            content: lastMessage.content,
+            createdAt: lastMessage.createdAt,
+          }
+        : null,
+    };
+  });
+
+  res.json(result);
+});
+
+app.post('/api/conversations', (req, res) => {
+  const { type, name, participantIds } = req.body;
+  const currentUserId = getCurrentUserId(req); // Mock current user ID
+
+  if (!type) {
+    return res.status(400).json({ error: 'Conversation type required' });
+  }
+
+  const allParticipantIds = [currentUserId, ...(participantIds || [])];
+
+  // For direct conversations, check if one already exists
+  if (type === 'direct' && participantIds.length === 1) {
+    const existingConversation = conversations.find(
+      c =>
+        c.type === 'direct' &&
+        c.participants.length === 2 &&
+        c.participants.some(p => p.id === currentUserId) &&
+        c.participants.some(p => p.id === participantIds[0])
+    );
+
+    if (existingConversation) {
+      return res.json(existingConversation);
+    }
+  }
+
+  const conversation = {
+    id: nextConversationId++,
+    type,
+    name: name || null,
+    participants: allParticipantIds
+      .map(id => {
+        const user = findUserById(id);
+        return user
+          ? {
+              id: user.id,
+              username: user.username,
+              displayName: user.displayName,
+            }
+          : null;
+      })
+      .filter(Boolean),
+    createdBy: currentUserId,
+    createdAt: new Date().toISOString(),
+  };
+
+  conversations.push(conversation);
+
+  res.json(conversation);
+});
+
+app.get('/api/conversations/:id/messages', (req, res) => {
+  const conversationId = parseInt(req.params.id);
+
+  const conversationMessages = messages.filter(
+    m => m.conversationId === conversationId
+  );
+
+  const result = conversationMessages.map(m => {
+    const sender = findUserById(m.senderId);
+    return {
+      id: m.id,
+      content: m.content,
+      senderId: m.senderId,
+      senderUsername: sender?.username || 'unknown',
+      createdAt: m.createdAt,
+    };
+  });
+
+  res.json(result);
+});
+
+app.post('/api/conversations/:id/messages', (req, res) => {
+  const conversationId = parseInt(req.params.id);
+  const { content } = req.body;
+  const currentUserId = getCurrentUserId(req); // Mock current user ID
+
+  if (!content) {
+    return res.status(400).json({ error: 'Message content required' });
+  }
+
+  const conversation = findConversation(conversationId);
+  if (!conversation) {
+    return res.status(404).json({ error: 'Conversation not found' });
+  }
+
+  const message = {
+    id: nextMessageId++,
+    conversationId,
+    content,
+    senderId: currentUserId,
+    createdAt: new Date().toISOString(),
+  };
+
+  messages.push(message);
+
+  // Broadcast via WebSocket
+  const sender = findUserById(currentUserId);
+  const wsMessage = {
+    id: message.id,
+    content: message.content,
+    senderId: message.senderId,
+    senderUsername: sender?.username || 'unknown',
+    createdAt: message.createdAt,
+  };
+
+  io.emit(`conversation-${conversationId}`, {
+    type: 'new-message',
+    message: wsMessage,
+  });
+
+  res.json(message);
 });
 
 // Mock notifications endpoint
@@ -206,66 +504,106 @@ const io = new SocketIOServer(server, {
   },
 });
 
-// Store messages for broadcasting
-let messages = [];
-
 io.on('connection', socket => {
-  console.log('WebSocket client connected:', socket.id);
+  console.log('User connected:', socket.id);
 
-  // Join conversation room
-  socket.on('join_conversation', data => {
-    const { conversationId } = data;
+  socket.on('join-conversation', conversationId => {
     socket.join(conversationId);
-    console.log(`Client ${socket.id} joined conversation ${conversationId}`);
+    console.log(`User ${socket.id} joined conversation ${conversationId}`);
   });
 
-  // Handle new messages
-  socket.on('send_message', data => {
-    const { conversationId, content, replyToId } = data;
+  socket.on('send-message', data => {
+    const { conversationId, content } = data;
+    const currentUserId = 1; // Mock current user ID
 
-    const newMessage = {
-      id: `msg-${Date.now()}`,
+    const conversation = findConversation(conversationId);
+    if (!conversation) return;
+
+    const message = {
+      id: nextMessageId++,
       conversationId,
-      senderId: '1',
-      sender: {
-        id: '1',
-        username: 'testuser',
-        displayName: 'Test User',
-      },
       content,
-      contentType: 'text',
-      timestamp: new Date().toISOString(),
-      isRead: false,
-      isOwn: true,
-      replyToId,
+      senderId: currentUserId,
+      createdAt: new Date().toISOString(),
     };
 
-    messages.push(newMessage);
-    io.to(conversationId).emit('new_message', newMessage);
-    console.log('New message sent:', newMessage);
+    messages.push(message);
+
+    // Broadcast to all users in the conversation
+    const sender = findUserById(currentUserId);
+    const wsMessage = {
+      id: message.id,
+      content: message.content,
+      senderId: message.senderId,
+      senderUsername: sender?.username || 'unknown',
+      createdAt: message.createdAt,
+    };
+
+    io.to(conversationId).emit('new-message', wsMessage);
   });
 
-  // Handle typing indicators
   socket.on('typing', data => {
     const { conversationId, isTyping } = data;
-    socket.to(conversationId).emit('typing', [
-      {
-        conversationId,
-        userId: socket.id,
-        isTyping,
-      },
-    ]);
+    socket.to(conversationId).emit('user-typing', { userId: 1, isTyping });
   });
 
   socket.on('disconnect', () => {
-    console.log('WebSocket client disconnected:', socket.id);
+    console.log('User disconnected:', socket.id);
   });
 });
 
+// Initialize with sample data
+function initializeSampleData() {
+  try {
+    // Add sample users
+    if (users.length <= 1) {
+      users.push(
+        { id: 2, username: 'alice', displayName: 'Alice' },
+        { id: 3, username: 'bob', displayName: 'Bob' },
+        { id: 4, username: 'charlie', displayName: 'Charlie' }
+      );
+    }
+
+    // Create sample conversation if none exist
+    if (conversations.length === 0) {
+      const conversation = {
+        id: nextConversationId++,
+        type: 'direct',
+        name: null,
+        participants: [
+          { id: 1, username: 'currentuser', displayName: 'Current User' },
+          { id: 2, username: 'alice', displayName: 'Alice' },
+        ],
+        createdBy: 1,
+        createdAt: new Date().toISOString(),
+      };
+
+      conversations.push(conversation);
+
+      // Create sample message
+      const message = {
+        id: nextMessageId++,
+        conversationId: conversation.id,
+        content: 'Hello there!',
+        senderId: 2,
+        createdAt: new Date().toISOString(),
+      };
+
+      messages.push(message);
+    }
+
+    console.log('Sample data initialized');
+  } catch (error) {
+    console.error('Failed to initialize sample data:', error);
+  }
+}
+
 const PORT = 3000;
+initializeSampleData();
 server.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`✅ Let's Chat server running on http://localhost:${PORT}`);
+  console.log(`✅ Health check: http://localhost:${PORT}/api/health`);
   console.log(
-    `🌐 Frontend URLs allowed: http://localhost:5173, http://localhost:5174`
+    `✅ Frontend URLs allowed: http://localhost:5173, http://localhost:5174`
   );
 });

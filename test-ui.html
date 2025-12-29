@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Let's Chat - Working Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .section {
+        background: white;
+        padding: 20px;
+        margin: 20px 0;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      input {
+        padding: 8px;
+        margin: 5px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .result {
+        background: #f8f9fa;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+        border-left: 4px solid #28a745;
+      }
+      .error {
+        border-left-color: #dc3545;
+        background: #f8d7da;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🚀 Let's Chat - Functionality Test</h1>
+
+    <div class="section">
+      <h2>1️⃣ Health Check</h2>
+      <button onclick="testHealth()">Test Health</button>
+      <div id="health-result"></div>
+    </div>
+
+    <div class="section">
+      <h2>2️⃣ Authentication</h2>
+      <input
+        type="text"
+        id="username"
+        placeholder="Username"
+        value="testuser"
+      />
+      <input
+        type="password"
+        id="password"
+        placeholder="Password"
+        value="password123"
+      />
+      <input
+        type="text"
+        id="displayName"
+        placeholder="Display Name"
+        value="Test User"
+      />
+      <br />
+      <button onclick="testRegister()">Register</button>
+      <button onclick="testLogin()">Login</button>
+      <div id="auth-result"></div>
+    </div>
+
+    <div class="section">
+      <h2>3️⃣ User Search</h2>
+      <input
+        type="text"
+        id="searchQuery"
+        placeholder="Search users..."
+        value="alice"
+      />
+      <button onclick="testUserSearch()">Search</button>
+      <div id="search-result"></div>
+    </div>
+
+    <div class="section">
+      <h2>4️⃣ Connection Request</h2>
+      <input
+        type="text"
+        id="connectUsername"
+        placeholder="Username to connect"
+        value="alice"
+      />
+      <button onclick="testConnectionRequest()">Send Request</button>
+      <button onclick="testGetConnections()">Get Connections</button>
+      <button onclick="testGetPendingConnections()">Get Pending</button>
+      <br><br>
+      <input type="number" id="acceptConnectionId" placeholder="Connection ID to accept">
+      <button onclick="testAcceptConnection()">Accept Connection</button>
+      <div id="connection-result"></div>
+    </div>
+
+    <div class="section">
+        <h2>7️⃣ Messaging</h2>
+        <input type="number" id="conversationId" placeholder="Conversation ID" value="1">
+        <input type="text" id="messageContent" placeholder="Message..." value="Hello from test!">
+        <button onclick="testSendMessage()">Send Message</button>
+        <button onclick="testGetMessages()">Get Messages</button>
+        <div id="message-result"></div>
+    </div>
+    </div>
+
+    <div class="section">
+      <h2>5️⃣ Connection Request</h2>
+      <input
+        type="text"
+        id="connectUsername"
+        placeholder="Username to connect"
+        value="alice"
+      />
+      <button onclick="testConnectionRequest()">Send Request</button>
+      <button onclick="testGetConnections()">Get Connections</button>
+      <button onclick="testGetPendingConnections()">Get Pending</button>
+      <div id="connection-result"></div>
+    </div>
+
+    <div class="section">
+      <h2>6️⃣ Messaging</h2>
+      <input
+        type="number"
+        id="conversationId"
+        placeholder="Conversation ID"
+        value="1"
+      />
+      <input
+        type="text"
+        id="messageContent"
+        placeholder="Message..."
+        value="Hello from test!"
+      />
+      <button onclick="testSendMessage()">Send Message</button>
+      <button onclick="testGetMessages()">Get Messages</button>
+      <div id="message-result"></div>
+    </div>
+
+    <script>
+      const API_BASE = '/api';
+      let currentUserId = 1; // Default user ID
+
+        // Set user ID for testing different users
+        function setUserId(userId) {
+            currentUserId = userId;
+            document.getElementById('current-user-id').textContent = userId;
+            console.log('Current User ID:', currentUserId);
+        }
+
+      function logResult(elementId, data, isError = false) {
+        const element = document.getElementById(elementId);
+        element.innerHTML = `<div class="result ${isError ? 'error' : ''}">${JSON.stringify(data, null, 2)}</div>`;
+      }
+
+      async function testHealth() {
+        try {
+          const response = await fetch(`${API_BASE}/health`);
+          const data = await response.json();
+          logResult('health-result', data);
+        } catch (error) {
+          logResult('health-result', { error: error.message }, true);
+        }
+      }
+
+      async function testRegister() {
+        try {
+          const response = await fetch(`${API_BASE}/auth/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: document.getElementById('username').value,
+              password: document.getElementById('password').value,
+              displayName: document.getElementById('displayName').value,
+            }),
+          });
+          const data = await response.json();
+          logResult('auth-result', data, !response.ok);
+        } catch (error) {
+          logResult('auth-result', { error: error.message }, true);
+        }
+      }
+
+      async function testLogin() {
+        try {
+          const response = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              username: document.getElementById('username').value,
+              password: document.getElementById('password').value,
+            }),
+          });
+          const data = await response.json();
+          logResult('auth-result', data, !response.ok);
+        } catch (error) {
+          logResult('auth-result', { error: error.message }, true);
+        }
+      }
+
+        async function testUserSearch() {
+            try {
+                const response = await fetch(`${API_BASE}/users/search?q=${document.getElementById('searchQuery').value}`, {
+                    headers: { 'X-User-ID': currentUserId }
+                });
+                const data = await response.json();
+                logResult('search-result', data);
+            } catch (error) {
+                logResult('search-result', { error: error.message }, true);
+            }
+        }
+      }
+
+        async function testConnectionRequest() {
+            try {
+                const response = await fetch(`${API_BASE}/connections/request`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-User-ID': currentUserId
+                    },
+                    body: JSON.stringify({
+                        username: document.getElementById('connectUsername').value
+                    })
+                });
+                const data = await response.json();
+                logResult('connection-result', data, !response.ok);
+            } catch (error) {
+                logResult('connection-result', { error: error.message }, true);
+            }
+        }
+
+        async function testGetConnections() {
+            try {
+                const response = await fetch(`${API_BASE}/connections`, {
+                    headers: { 'X-User-ID': currentUserId }
+                });
+                const data = await response.json();
+                logResult('connection-result', data);
+            } catch (error) {
+                logResult('connection-result', { error: error.message }, true);
+            }
+        }
+
+        async function testGetPendingConnections() {
+            try {
+                const response = await fetch(`${API_BASE}/connections/pending`, {
+                    headers: { 'X-User-ID': currentUserId }
+                });
+                const data = await response.json();
+                logResult('connection-result', data);
+            } catch (error) {
+                logResult('connection-result', { error: error.message }, true);
+            }
+        }
+
+        async function testAcceptConnection() {
+            const connectionId = document.getElementById('acceptConnectionId').value;
+            if (!connectionId) {
+                logResult('connection-result', { error: 'Please enter a connection ID' }, true);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/connections/${connectionId}/accept`, {
+                    method: 'POST',
+                    headers: { 'X-User-ID': currentUserId }
+                });
+                const data = await response.json();
+                logResult('connection-result', data, !response.ok);
+            } catch (error) {
+                logResult('connection-result', { error: error.message }, true);
+            }
+        }
+      }
+
+      async function testGetConnections() {
+        try {
+          const response = await fetch(`${API_BASE}/connections`);
+          const data = await response.json();
+          logResult('connection-result', data);
+        } catch (error) {
+          logResult('connection-result', { error: error.message }, true);
+        }
+      }
+
+      async function testCreateDirectConversation() {
+        try {
+          const response = await fetch(`${API_BASE}/conversations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'direct',
+              participantIds: [2], // alice's ID
+            }),
+          });
+          const data = await response.json();
+          logResult('conversation-result', data, !response.ok);
+        } catch (error) {
+          logResult('conversation-result', { error: error.message }, true);
+        }
+      }
+
+      async function testCreateGroupConversation() {
+        try {
+          const response = await fetch(`${API_BASE}/conversations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'group',
+              name: 'Test Group from UI',
+              participantIds: [2, 3], // alice and bob
+            }),
+          });
+          const data = await response.json();
+          logResult('conversation-result', data, !response.ok);
+        } catch (error) {
+          logResult('conversation-result', { error: error.message }, true);
+        }
+      }
+
+      async function testGetConversations() {
+        try {
+          const response = await fetch(`${API_BASE}/conversations`);
+          const data = await response.json();
+          logResult('conversation-result', data);
+        } catch (error) {
+          logResult('conversation-result', { error: error.message }, true);
+        }
+      }
+
+      async function testSendMessage() {
+        try {
+          const conversationId =
+            document.getElementById('conversationId').value;
+          const response = await fetch(
+            `${API_BASE}/conversations/${conversationId}/messages`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                content: document.getElementById('messageContent').value,
+              }),
+            }
+          );
+          const data = await response.json();
+          logResult('message-result', data, !response.ok);
+        } catch (error) {
+          logResult('message-result', { error: error.message }, true);
+        }
+      }
+
+      async function testGetMessages() {
+        try {
+          const conversationId =
+            document.getElementById('conversationId').value;
+          const response = await fetch(
+            `${API_BASE}/conversations/${conversationId}/messages`
+          );
+          const data = await response.json();
+          logResult('message-result', data);
+        } catch (error) {
+          logResult('message-result', { error: error.message }, true);
+        }
+      }
+
+      // Auto-run health check on page load
+      window.onload = () => testHealth();
+    </script>
+  </body>
+</html>
