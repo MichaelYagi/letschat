@@ -730,7 +730,6 @@ export class WebSocketService {
     }
   }
 
-
   /**
    * Start heartbeat
    */
@@ -738,6 +737,7 @@ export class WebSocketService {
     setInterval(() => {
       this.io.emit('ping');
     }, 30000);
+  }
   }
 }
 
