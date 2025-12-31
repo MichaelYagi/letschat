@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voice Call Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      button {
+        padding: 15px 25px;
+        margin: 10px;
+        font-size: 16px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        background: #007bff;
+        color: white;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      .test-section {
+        margin: 30px 0;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      #results {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>📞 Voice Call Audio Test</h1>
+    <p>This page tests the audio notifications for voice calls.</p>
+
+    <div class="test-section">
+      <h2>🔔 Notification Permission</h2>
+      <button onclick="requestNotificationPermission()">
+        Request Notification Permission
+      </button>
+      <p id="notification-status"></p>
+    </div>
+
+    <div class="test-section">
+      <h2>🎵 Audio Tests</h2>
+      <button onclick="testRingtone()">Play Ringtone</button>
+      <button onclick="testDialingSound()">Play Dialing Sound</button>
+      <button onclick="testAcceptSound()">Play Accept Sound</button>
+      <button onclick="testRejectSound()">Play Reject Sound</button>
+      <button onclick="testEndSound()">Play End Sound</button>
+      <button onclick="stopAllSounds()">Stop All Sounds</button>
+    </div>
+
+    <div class="test-section">
+      <h2>📋 Test Results</h2>
+      <div id="results">
+        Click the test buttons above to verify audio functionality.
+      </div>
+    </div>
+
+    <script type="module">
+      // Import the call sounds utilities
+      import {
+        startRinging,
+        stopRinging,
+        playDialingSound,
+        playAcceptSound,
+        playRejectSound,
+        playEndSound,
+        requestNotificationPermission,
+        showCallNotification,
+      } from './src/utils/callSounds.ts';
+
+      // Make functions globally available
+      window.testRingtone = () => {
+        console.log('🔔 Testing ringtone...');
+        try {
+          startRinging();
+          log('✅ Ringtone started successfully');
+        } catch (error) {
+          log('❌ Ringtone failed: ' + error.message);
+        }
+      };
+
+      window.testDialingSound = () => {
+        console.log('📞 Testing dialing sound...');
+        try {
+          playDialingSound();
+          log('✅ Dialing sound played successfully');
+        } catch (error) {
+          log('❌ Dialing sound failed: ' + error.message);
+        }
+      };
+
+      window.testAcceptSound = () => {
+        console.log('✅ Testing accept sound...');
+        try {
+          playAcceptSound();
+          log('✅ Accept sound played successfully');
+        } catch (error) {
+          log('❌ Accept sound failed: ' + error.message);
+        }
+      };
+
+      window.testRejectSound = () => {
+        console.log('❌ Testing reject sound...');
+        try {
+          playRejectSound();
+          log('✅ Reject sound played successfully');
+        } catch (error) {
+          log('❌ Reject sound failed: ' + error.message);
+        }
+      };
+
+      window.testEndSound = () => {
+        console.log('📞 Testing end sound...');
+        try {
+          playEndSound();
+          log('✅ End sound played successfully');
+        } catch (error) {
+          log('❌ End sound failed: ' + error.message);
+        }
+      };
+
+      window.stopAllSounds = () => {
+        console.log('🔇 Stopping all sounds...');
+        try {
+          stopRinging();
+          log('✅ All sounds stopped');
+        } catch (error) {
+          log('❌ Stop sounds failed: ' + error.message);
+        }
+      };
+
+      window.requestNotificationPermission = async () => {
+        console.log('🔔 Requesting notification permission...');
+        try {
+          const granted = await requestNotificationPermission();
+          const status = document.getElementById('notification-status');
+          status.textContent = granted
+            ? '✅ Notification permission granted'
+            : '❌ Notification permission denied';
+          log(
+            granted
+              ? '✅ Notification permission granted'
+              : '❌ Notification permission denied'
+          );
+
+          if (granted) {
+            showCallNotification(
+              'Test Call',
+              'This is a test notification from the voice call system'
+            );
+          }
+        } catch (error) {
+          log('❌ Notification permission failed: ' + error.message);
+        }
+      };
+
+      function log(message) {
+        const results = document.getElementById('results');
+        const timestamp = new Date().toLocaleTimeString();
+        results.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+        console.log(message);
+      }
+
+      // Initialize on load
+      window.addEventListener('load', () => {
+        log('🧪 Voice Call Audio Test Ready');
+        log('📋 Steps to test:');
+        log('1. Click "Request Notification Permission"');
+        log('2. Test each audio button');
+        log('3. Check browser console for detailed logs');
+        log('4. Verify notifications appear in browser');
+      });
+    </script>
+  </body>
+</html>

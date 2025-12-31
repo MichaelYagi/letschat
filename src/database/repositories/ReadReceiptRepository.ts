@@ -55,38 +55,59 @@ export class ReadReceiptRepository {
     userId: string,
     status: 'sent' | 'delivered' | 'read' | 'failed'
   ): Promise<MessageDeliveryStatus> {
-    try {
-      const deliveryStatus = {
-        id: uuidv4(),
-        message_id: messageId,
-        user_id: userId,
-        status,
-        timestamp: new Date(),
-      };
+    const maxRetries = 3;
+    let lastError: Error | null = null;
 
-      await db('message_delivery_status')
-        .insert(deliveryStatus)
-        .onConflict(['message_id', 'user_id'])
-        .merge();
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const deliveryStatus = {
+          id: uuidv4(),
+          message_id: messageId,
+          user_id: userId,
+          status,
+          timestamp: new Date(),
+        };
 
-      const result = await db('message_delivery_status')
-        .where('id', deliveryStatus.id)
-        .first();
+        await db('message_delivery_status')
+          .insert(deliveryStatus)
+          .onConflict(['message_id', 'user_id'])
+          .merge();
 
-      logger.info(
-        `Updated delivery status for message ${messageId} to ${status} for user ${userId}`
-      );
-      return {
-        id: result.id,
-        messageId: result.message_id,
-        userId: result.user_id,
-        status: result.status,
-        timestamp: new Date(result.timestamp),
-      };
-    } catch (error) {
-      logger.error('Error updating delivery status:', error);
-      throw error;
+        const result = await db('message_delivery_status')
+          .where('id', deliveryStatus.id)
+          .first();
+
+        logger.info(
+          `Updated delivery status for message ${messageId} to ${status} for user ${userId}`
+        );
+        return {
+          id: result.id,
+          messageId: result.message_id,
+          userId: result.user_id,
+          status: result.status,
+          timestamp: new Date(result.timestamp),
+        };
+      } catch (error: any) {
+        lastError = error;
+
+        // If it's a SQLite busy error and we haven't exhausted retries, wait and retry
+        if (error.code === 'SQLITE_BUSY' && attempt < maxRetries) {
+          const waitTime = Math.random() * 100 * attempt; // Exponential backoff with jitter
+          logger.warn(
+            `Database locked, retrying in ${waitTime}ms (attempt ${attempt}/${maxRetries})`
+          );
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+
+        // For other errors or final attempt, throw immediately
+        logger.error('Error updating delivery status:', error);
+        throw error;
+      }
     }
+
+    // This should never be reached, but TypeScript needs it
+    throw lastError || new Error('Failed to update delivery status');
   }
 
   async getMessageReadReceipts(

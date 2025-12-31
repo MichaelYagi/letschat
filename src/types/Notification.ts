@@ -1,7 +1,14 @@
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'message' | 'connection_request' | 'mention' | 'system';
+  type:
+    | 'message'
+    | 'connection_request'
+    | 'mention'
+    | 'system'
+    | 'incoming-call'
+    | 'call-missed'
+    | 'call-ended';
   title: string;
   message: string;
   data?: string | null;
@@ -11,7 +18,14 @@ export interface Notification {
 
 export interface CreateNotificationRequest {
   userId: string;
-  type: 'message' | 'connection_request' | 'mention' | 'system';
+  type:
+    | 'message'
+    | 'connection_request'
+    | 'mention'
+    | 'system'
+    | 'incoming-call'
+    | 'call-missed'
+    | 'call-ended';
   title: string;
   message: string;
   data?: any;
@@ -32,6 +46,7 @@ export interface NotificationCount {
   connection_requests: number;
   mentions: number;
   system: number;
+  calls: number;
 }
 
 export interface NotificationEvent {

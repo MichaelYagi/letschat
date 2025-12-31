@@ -11,6 +11,7 @@ interface UseWebSocketReturn {
   typingUsers: Set<string>;
   notifications: Notification[];
   notificationCounts: NotificationCount;
+  callSignal: any;
   sendMessage: (
     conversationId: string,
     content: string,
@@ -38,6 +39,7 @@ export function useWebSocket(): UseWebSocketReturn {
       mentions: 0,
       system: 0,
     });
+  const [callSignal, setCallSignal] = useState<any>(null);
   const { token, user } = useAuth();
 
   useEffect(() => {
@@ -252,6 +254,33 @@ export function useWebSocket(): UseWebSocketReturn {
       });
     });
 
+    // Handle incoming call signals
+    newSocket.on('call-signal', (message: any) => {
+      console.log('📞 Received call signal:', message);
+      setCallSignal(message);
+    });
+
+    // Handle specific call events
+    newSocket.on('call-offer', (message: any) => {
+      console.log('📞 [WebSocket] Received call-offer:', message);
+      setCallSignal({ ...message, type: 'call-offer' });
+    });
+
+    newSocket.on('call-answer', (message: any) => {
+      console.log('📞 [WebSocket] Received call-answer:', message);
+      setCallSignal({ ...message, type: 'call-answer' });
+    });
+
+    newSocket.on('call-rejected', (message: any) => {
+      console.log('📞 [WebSocket] Received call-rejected:', message);
+      setCallSignal({ ...message, type: 'call-rejected' });
+    });
+
+    newSocket.on('ice-candidate', (message: any) => {
+      console.log('🧊 [WebSocket] Received ice-candidate:', message);
+      setCallSignal({ ...message, type: 'ice-candidate' });
+    });
+
     setSocket(newSocket);
 
     return () => {
@@ -297,8 +326,19 @@ export function useWebSocket(): UseWebSocketReturn {
   );
 
   const sendCallMessage = (message: any) => {
+    console.log('📞 sendCallMessage called:', {
+      message: message.type,
+      socket: socket ? 'exists' : 'null',
+      connected,
+    });
+
     if (socket && connected) {
+      console.log('📞 Sending call signal:', message);
       socket.emit('call-signal', message);
+    } else {
+      console.error('❌ Cannot send call signal - socket not connected');
+      console.error('  - socket:', socket ? 'exists' : 'null');
+      console.error('  - connected:', connected);
     }
   };
 
@@ -322,6 +362,7 @@ export function useWebSocket(): UseWebSocketReturn {
     typingUsers,
     notifications,
     notificationCounts,
+    callSignal,
     sendMessage,
     joinConversation,
     leaveConversation,

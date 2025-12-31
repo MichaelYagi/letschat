@@ -17,6 +17,7 @@ import { MainLayout } from './components/layout/MainLayout';
 import { ConversationListWrapper } from './components/wrappers/ConversationListWrapper';
 import { Connections } from './components/connections/Connections';
 import { RegistrationDebug } from './components/debug/RegistrationDebug';
+import { AudioDebugPage } from './components/debug/AudioDebugPage';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
 
@@ -66,6 +67,7 @@ function AppContent() {
               <Route path='/chat/:conversationId' element={<ChatPage />} />
               <Route path='/friends' element={<Connections />} />
               <Route path='/profile' element={<UserProfile />} />
+              <Route path='/audio-debug' element={<AudioDebugPage />} />
               <Route
                 path='/settings'
                 element={

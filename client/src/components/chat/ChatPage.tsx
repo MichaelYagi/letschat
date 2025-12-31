@@ -7,6 +7,8 @@ import { useWebSocket } from '../../hooks/useWebSocket';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useSoundNotifications } from '../../hooks/useSoundNotifications';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCalling } from '../../hooks/useCalling';
+import { CallUI } from '../calling/CallUI';
 import { Phone, Video, Info } from 'lucide-react';
 import api from '../../services/api';
 
@@ -29,6 +31,8 @@ export function ChatPage({ conversationName }: ChatPageProps) {
 
   const { addNotification } = useNotifications();
   const { playNotificationSound } = useSoundNotifications();
+  const { callState, startCall, acceptCall, rejectCall, endCall } =
+    useCalling();
 
   // Convert typingUsers Set to array of user objects
   const typingUsersArray = Array.from(typingUsers).map(userId => ({
@@ -234,10 +238,40 @@ export function ChatPage({ conversationName }: ChatPageProps) {
           </div>
 
           <div className='flex items-center space-x-2'>
-            <button className='p-2 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-full'>
+            <button
+              onClick={() => {
+                const otherParticipant =
+                  conversationDetails?.participants?.find(
+                    (p: any) => p.id !== user?.id
+                  );
+                if (otherParticipant) {
+                  startCall(
+                    otherParticipant.id,
+                    otherParticipant.displayName || otherParticipant.username,
+                    'voice'
+                  );
+                }
+              }}
+              className='p-2 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-full'
+            >
               <Phone size={20} />
             </button>
-            <button className='p-2 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-full'>
+            <button
+              onClick={() => {
+                const otherParticipant =
+                  conversationDetails?.participants?.find(
+                    (p: any) => p.id !== user?.id
+                  );
+                if (otherParticipant) {
+                  startCall(
+                    otherParticipant.id,
+                    otherParticipant.displayName || otherParticipant.username,
+                    'video'
+                  );
+                }
+              }}
+              className='p-2 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-full'
+            >
               <Video size={20} />
             </button>
             <button className='p-2 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded-full'>
@@ -268,6 +302,26 @@ export function ChatPage({ conversationName }: ChatPageProps) {
           onSendMessage={handleSendMessage}
           onTyping={handleTyping}
           disabled={!connected}
+        />
+      )}
+
+      {/* Call UI Overlay */}
+      {(callState.isIncomingCall ||
+        callState.isOutgoingCall ||
+        callState.isInCall ||
+        callState.isConnecting) && (
+        <CallUI
+          currentUserId={user?.id || ''}
+          targetUserId={callState.remoteUserId || undefined}
+          targetUsername={callState.remoteUsername || undefined}
+          isVideoCall={callState.currentCallType === 'video'}
+          isIncomingCall={callState.isIncomingCall}
+          isOutgoingCall={callState.isOutgoingCall}
+          propIsInCall={callState.isInCall}
+          propIsConnecting={callState.isConnecting}
+          onEndCall={endCall}
+          onAcceptCall={acceptCall}
+          onRejectCall={rejectCall}
         />
       )}
     </div>

@@ -18,7 +18,12 @@ interface CallUIProps {
   targetUsername?: string;
   isVideoCall?: boolean;
   isIncomingCall?: boolean;
+  isOutgoingCall?: boolean;
+  propIsInCall?: boolean;
+  propIsConnecting?: boolean;
   onEndCall?: () => void;
+  onAcceptCall?: () => void;
+  onRejectCall?: () => void;
   className?: string;
 }
 
@@ -28,25 +33,47 @@ export function CallUI({
   targetUsername,
   isVideoCall = false,
   isIncomingCall = false,
+  isOutgoingCall = false,
+  propIsInCall = false,
+  propIsConnecting = false,
   onEndCall,
+  onAcceptCall,
+  onRejectCall,
   className = '',
 }: CallUIProps) {
-  const [isInCall, setIsInCall] = useState(false);
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [callUsers, setCallUsers] = useState<CallUser[]>([]);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [localIsConnecting, setLocalIsConnecting] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
+  const [webRTCConnected, setWebRTCConnected] = useState(false);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Use prop values to determine call state - IMMEDIATELY show active call
+  const activeIsInCall = propIsInCall; // Trust the hook state completely
+  const activeIsConnecting = propIsConnecting || localIsConnecting;
+
+  console.log('🎯 CallUI state:', {
+    isIncomingCall,
+    targetUserId,
+    webRTCConnected,
+    activeIsInCall,
+    activeIsConnecting,
+    propIsInCall,
+    propIsConnecting,
+    localIsConnecting,
+  });
 
   useEffect(() => {
     // Set up WebRTC event listeners
     const handleCallStarted = (event: CallEvent) => {
-      setIsInCall(true);
-      setIsConnecting(false);
+      console.log('📞 CallUI: Call started event received');
+      setWebRTCConnected(true);
+      setLocalIsConnecting(false);
       startCallTimer();
 
       // Set local video
@@ -56,7 +83,7 @@ export function CallUI({
     };
 
     const handleCallEnded = () => {
-      setIsInCall(false);
+      setWebRTCConnected(false);
       setCallDuration(0);
       stopCallTimer();
       if (onEndCall) {
@@ -65,9 +92,25 @@ export function CallUI({
     };
 
     const handleUserJoined = (event: CallEvent) => {
-      if (remoteVideoRef.current && event.data?.stream) {
-        remoteVideoRef.current.srcObject = event.data.stream;
+      console.log('👥 CallUI: User joined event received', event);
+      if (event.data?.stream) {
+        // For video calls, attach to video element
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = event.data.stream;
+        }
+
+        // For voice calls, attach to audio element
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = event.data.stream;
+          remoteAudioRef.current.play().catch(err => {
+            console.log('Auto-play prevented for remote audio:', err);
+          });
+        }
       }
+
+      // Ensure we're in call state and not connecting
+      setWebRTCConnected(true);
+      setLocalIsConnecting(false);
     };
 
     const handleUserLeft = () => {
@@ -123,7 +166,7 @@ export function CallUI({
   const startCall = async () => {
     if (!targetUserId) return;
 
-    setIsConnecting(true);
+    setLocalIsConnecting(true);
     try {
       // Initialize local stream
       const stream = await webrtcService.initializeLocalStream(
@@ -144,26 +187,21 @@ export function CallUI({
       }
     } catch (error) {
       console.error('Failed to start call:', error);
-      setIsConnecting(false);
+      setLocalIsConnecting(false);
     }
   };
 
   const acceptCall = async () => {
     if (!targetUserId) return;
 
-    setIsConnecting(true);
+    setLocalIsConnecting(true);
     try {
-      // Initialize local stream
-      const stream = await webrtcService.initializeLocalStream(
-        true,
-        isVideoCall
-      );
-
-      // Create answer for incoming call
-      // This would handle the incoming offer and create an answer
+      // Note: The actual WebRTC logic is handled in the useCalling hook
+      // This just shows the connecting state
+      console.log('🔄 Accepting call and establishing connection...');
     } catch (error) {
       console.error('Failed to accept call:', error);
-      setIsConnecting(false);
+      setLocalIsConnecting(false);
     }
   };
 
@@ -193,8 +231,17 @@ export function CallUI({
     setIsVideoOff(!videoOff);
   };
 
-  if (!isInCall && !isConnecting) {
-    // Incoming/Outgoing call UI
+  console.log('🔍 Decision: Show incoming/outgoing UI?', {
+    activeIsInCall,
+    activeIsConnecting,
+    isIncomingCall,
+    targetUserId,
+    shouldShow: !activeIsInCall && !activeIsConnecting,
+  });
+
+  if (isIncomingCall && !activeIsInCall && !activeIsConnecting) {
+    // Incoming call UI
+    console.log('✅ Showing incoming/outgoing call UI');
     return (
       <div
         className={`fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-50 ${className}`}
@@ -218,7 +265,7 @@ export function CallUI({
             {isIncomingCall ? (
               <>
                 <button
-                  onClick={acceptCall}
+                  onClick={onAcceptCall}
                   className='bg-green-500 hover:bg-green-600 text-white p-4 rounded-full transition-colors'
                 >
                   <Phone size={24} />
@@ -231,12 +278,20 @@ export function CallUI({
                 </button>
               </>
             ) : (
-              <button
-                onClick={startCall}
-                className='bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-full transition-colors'
-              >
-                <Phone size={24} />
-              </button>
+              <>
+                <button
+                  onClick={startCall}
+                  className='bg-blue-500 hover:bg-blue-600 text-white p-4 rounded-full transition-colors'
+                >
+                  <Phone size={24} />
+                </button>
+                <button
+                  onClick={rejectCall}
+                  className='bg-red-500 hover:bg-red-600 text-white p-4 rounded-full transition-colors'
+                >
+                  <PhoneOff size={24} />
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -244,7 +299,7 @@ export function CallUI({
     );
   }
 
-  if (isConnecting) {
+  if (activeIsConnecting) {
     return (
       <div
         className={`fixed inset-0 bg-gray-900 flex items-center justify-center z-50 ${className}`}
@@ -291,6 +346,9 @@ export function CallUI({
             </div>
           )}
         </div>
+
+        {/* Hidden audio element for voice calls */}
+        <audio ref={remoteAudioRef} autoPlay playsInline className='hidden' />
 
         {/* Local Video (picture-in-picture for video calls) */}
         {isVideoCall && (

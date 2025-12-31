@@ -13,7 +13,14 @@ export class NotificationRepository {
    */
   static async create(
     userId: string,
-    type: 'message' | 'connection_request' | 'mention' | 'system',
+    type:
+      | 'message'
+      | 'connection_request'
+      | 'mention'
+      | 'system'
+      | 'incoming-call'
+      | 'call-missed'
+      | 'call-ended',
     title: string,
     message: string,
     data?: any
@@ -189,6 +196,12 @@ export class NotificationRepository {
       .whereNull('read_at')
       .count({ count: '*' });
 
+    const [callsResult] = await db('notifications')
+      .where('user_id', userId)
+      .whereIn('type', ['incoming-call', 'call-missed', 'call-ended'])
+      .whereNull('read_at')
+      .count({ count: '*' });
+
     const [totalResult] = await db('notifications')
       .where('user_id', userId)
       .whereNull('read_at')
@@ -200,6 +213,7 @@ export class NotificationRepository {
       connection_requests: Number(connectionRequestsResult.count),
       mentions: Number(mentionsResult.count),
       system: Number(systemResult.count),
+      calls: Number(callsResult.count),
     };
   }
 }

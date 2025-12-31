@@ -33,6 +33,15 @@ class WebSocketManager {
   }
 
   /**
+   * Send notification to specific user with raw data
+   */
+  sendNotificationDataToUser(userId: string, event: string, data: any): void {
+    if (this.wsService) {
+      this.wsService.sendToUser(userId, event, data);
+    }
+  }
+
+  /**
    * Update notification count for user
    */
   async updateNotificationCount(userId: string): Promise<void> {

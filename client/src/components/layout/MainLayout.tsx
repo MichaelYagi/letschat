@@ -4,6 +4,7 @@ import { LogOut, User, Settings, MessageCircle, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import { NotificationSettings } from '../NotificationSettings';
+import { GlobalCallManager } from '../calling/GlobalCallManager';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -114,6 +115,9 @@ export function MainLayout({
 
       {/* Main Content */}
       <main className='flex-1 overflow-hidden'>{children}</main>
+
+      {/* Global Call Manager */}
+      <GlobalCallManager />
     </div>
   );
 }

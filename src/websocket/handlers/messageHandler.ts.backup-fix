@@ -837,8 +837,7 @@ export class WebSocketService {
 
       // Send call offer to target user (real-time signaling)
       const notificationData = {
-        type: 'call-offer',
-        targetUserId,
+        type: 'incoming-call',
         fromUserId,
         fromUsername,
         callType: callType || 'voice',
@@ -846,7 +845,7 @@ export class WebSocketService {
         timestamp: new Date().toISOString(),
       };
 
-      this.sendToUser(targetUserId, 'call-offer', notificationData);
+      this.sendToUser(targetUserId, 'incoming-call', notificationData);
 
       // Create persistent notification in database
       await NotificationService.createIncomingCallNotification(
@@ -880,15 +879,10 @@ export class WebSocketService {
         return;
       }
 
-      // Get caller's username for display
-      const callerUser = await UserRepository.findById(fromUserId);
-      const callerUsername = callerUser?.username || 'Unknown';
-
       // Forward answer to target user
       const answerData = {
         type: 'call-answer',
         fromUserId,
-        fromUsername: callerUsername,
         answer,
         timestamp: new Date().toISOString(),
       };

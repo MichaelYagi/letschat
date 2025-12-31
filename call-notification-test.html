@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Call Notification Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .status {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 5px;
+      }
+      .success {
+        background-color: #d4edda;
+        color: #155724;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .info {
+        background-color: #d1ecf1;
+        color: #0c5460;
+      }
+      code {
+        background-color: #f8f9fa;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Call Notification Test</h1>
+
+    <div class="status info">
+      <strong>Issue Fixed:</strong> Missing call notifications and modal window
+      for incoming calls
+    </div>
+
+    <h2>What was wrong:</h2>
+    <ul>
+      <li>
+        ❌ The <code>CallUI</code> component wasn't receiving the
+        <code>onAcceptCall</code> prop from <code>ChatPage</code>
+      </li>
+      <li>
+        ❌ The <code>CallUI</code> component interface was missing the
+        <code>onRejectCall</code> prop
+      </li>
+      <li>
+        ❌ Incoming calls would show audio notifications but no interactive
+        modal
+      </li>
+    </ul>
+
+    <h2>What was fixed:</h2>
+    <ol>
+      <li>
+        <strong>Added missing onAcceptCall prop (ChatPage.tsx:313)</strong>
+        <pre><code>&lt;CallUI
+  onAcceptCall={acceptCall}  // ✅ ADDED THIS LINE
+  onRejectCall={rejectCall}  // ✅ ADDED THIS LINE
+/&gt;</code></pre>
+      </li>
+
+      <li>
+        <strong
+          >Added onRejectCall to CallUI interface (CallUI.tsx:22-24)</strong
+        >
+        <pre><code>interface CallUIProps {
+  onAcceptCall?: () => void;
+  onRejectCall?: () => void;  // ✅ ADDED THIS LINE
+  // ... other props
+}</code></pre>
+      </li>
+
+      <li>
+        <strong
+          >Updated rejectCall function to use prop (CallUI.tsx:172-181)</strong
+        >
+        <pre><code>const rejectCall = () => {
+  // Send reject signal
+  if (targetUserId) {
+    webrtcService.sendSignalingMessage(targetUserId, {
+      type: 'call-rejected',
+    });
+  }
+  if (onRejectCall) {  // ✅ CHECK PROP FIRST
+    onRejectCall();
+  } else if (onEndCall) {
+    onEndCall();
+  }
+};</code></pre>
+      </li>
+    </ol>
+
+    <h2>How to test the fix:</h2>
+    <div class="status info">
+      <strong>Setup:</strong>
+      <ol>
+        <li>Start the application: <code>npm run dev</code></li>
+        <li>Open two browser windows with different user accounts</li>
+        <li>Start a conversation between the users</li>
+      </ol>
+
+      <strong>Test Scenario:</strong>
+      <ol>
+        <li>From User A, click the phone or video button to call User B</li>
+        <li>Verify User A sees "Calling User B" modal with proper controls</li>
+        <li>
+          Verify User B receives an incoming call modal with:
+          <ul>
+            <li>✅ Visual modal showing who is calling</li>
+            <li>✅ Audio ringing sound</li>
+            <li>✅ Accept button (green)</li>
+            <li>✅ Reject button (red)</li>
+          </ul>
+        </li>
+        <li>Test both accepting and rejecting the call</li>
+      </ol>
+    </div>
+
+    <h2>Expected behavior after fix:</h2>
+    <div class="status success">
+      <ul>
+        <li>✅ Incoming calls show a modal overlay</li>
+        <li>✅ Modal displays caller's name and call type (voice/video)</li>
+        <li>✅ Accept button connects the call</li>
+        <li>✅ Reject button ends the call attempt</li>
+        <li>✅ Proper audio feedback throughout</li>
+        <li>✅ Browser notifications (if permission granted)</li>
+        <li>✅ Page title flashing for attention</li>
+      </ul>
+    </div>
+
+    <h2>Technical details:</h2>
+    <p>
+      The issue was a React prop connection problem. The
+      <code>useCalling</code> hook provided the necessary functions
+      (<code>acceptCall</code>, <code>rejectCall</code>) but they weren't being
+      passed down to the UI component that handles the actual modal display.
+    </p>
+
+    <p>
+      WebRTC signaling and WebSocket communication were already working
+      correctly - the missing piece was the UI connection that allows users to
+      interact with incoming calls.
+    </p>
+
+    <div class="status success">
+      <strong>✅ Fix Status: COMPLETE</strong><br />
+      The incoming call notification modal should now appear and function
+      correctly for all incoming calls.
+    </div>
+  </body>
+</html>

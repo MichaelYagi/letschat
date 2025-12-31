@@ -3,7 +3,7 @@
 const bcrypt = require('bcryptjs');
 const sqlite3 = require('sqlite3').verbose();
 
-const db = new sqlite3.Database('./chat.db');
+const db = new sqlite3.Database('./data/chat.db');
 
 async function hashPasswords() {
   return new Promise((resolve, reject) => {

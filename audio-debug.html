@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audio Debug Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      button {
+        margin: 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+      }
+      .log {
+        background: #f0f0f0;
+        padding: 10px;
+        margin: 10px 0;
+        font-family: monospace;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Audio Debug Test</h1>
+    <button onclick="testNotificationPermission()">
+      Test Notification Permission
+    </button>
+    <button onclick="testDialingSound()">Test Dialing Sound</button>
+    <button onclick="testRingingSound()">Test Ringing Sound</button>
+    <button onclick="testSimpleBeep()">Test Simple Beep</button>
+    <div id="log" class="log"></div>
+
+    <script>
+      function log(message) {
+        const logDiv = document.getElementById('log');
+        logDiv.innerHTML +=
+          new Date().toLocaleTimeString() + ': ' + message + '<br>';
+        console.log(message);
+      }
+
+      let audioContext = null;
+
+      function initAudioContext() {
+        if (!audioContext) {
+          try {
+            audioContext = new (
+              window.AudioContext || window.webkitAudioContext
+            )();
+            log('✅ AudioContext created successfully');
+            return true;
+          } catch (error) {
+            log('❌ Failed to create AudioContext: ' + error.message);
+            return false;
+          }
+        }
+        return true;
+      }
+
+      async function testNotificationPermission() {
+        log('🔔 Testing notification permission...');
+
+        if ('Notification' in window) {
+          const permission = await Notification.requestPermission();
+          log('📝 Notification permission: ' + permission);
+
+          if (permission === 'granted') {
+            new Notification('Test Notification', {
+              body: 'This is a test notification for incoming calls',
+              icon: '/favicon.ico',
+              requireInteraction: true,
+            });
+            log('✅ Test notification sent');
+          }
+        } else {
+          log('❌ Notifications not supported in this browser');
+        }
+      }
+
+      function testSimpleBeep() {
+        log('🔊 Testing simple beep...');
+
+        if (!initAudioContext()) return;
+
+        try {
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+
+          oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+          oscillator.type = 'sine';
+
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(
+            0.01,
+            audioContext.currentTime + 0.5
+          );
+
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.5);
+
+          log('✅ Simple beep played');
+        } catch (error) {
+          log('❌ Failed to play simple beep: ' + error.message);
+        }
+      }
+
+      function testDialingSound() {
+        log('📞 Testing dialing sound...');
+
+        if (!initAudioContext()) return;
+
+        try {
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+
+          const now = audioContext.currentTime;
+
+          // Configure dialing tone (440 Hz - standard dial tone)
+          oscillator.frequency.setValueAtTime(440, now);
+          oscillator.type = 'sine';
+          gainNode.gain.setValueAtTime(0.1, now); // Start immediately with volume
+
+          oscillator.start(now);
+
+          // Create pulsing dialing effect (on for 1 second, off for 1 second)
+          let pulseCount = 0;
+          const pulseInterval = setInterval(() => {
+            if (gainNode && audioContext) {
+              const currentTime = audioContext.currentTime;
+              if (pulseCount % 2 === 0) {
+                // Turn on
+                gainNode.gain.setValueAtTime(0.1, currentTime);
+              } else {
+                // Turn off
+                gainNode.gain.setValueAtTime(0, currentTime);
+              }
+              pulseCount++;
+            }
+          }, 1000);
+
+          // Stop after 6 seconds (3 pulses)
+          setTimeout(() => {
+            clearInterval(pulseInterval);
+            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+            log('📞 Dialing sound stopped');
+          }, 6000);
+
+          log('✅ Dialing sound started (will play for 6 seconds)');
+        } catch (error) {
+          log('❌ Failed to play dialing sound: ' + error.message);
+        }
+      }
+
+      function testRingingSound() {
+        log('🔔 Testing ringing sound...');
+
+        if (!initAudioContext()) return;
+
+        try {
+          const playRingtone = () => {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            const now = audioContext.currentTime;
+
+            // Create ringtone pattern (alternating frequencies)
+            oscillator.frequency.setValueAtTime(800, now);
+            oscillator.frequency.setValueAtTime(600, now + 0.3);
+            oscillator.frequency.setValueAtTime(800, now + 0.6);
+            oscillator.type = 'sine';
+            gainNode.gain.setValueAtTime(0.1, now);
+
+            oscillator.start(now);
+            oscillator.stop(now + 2);
+          };
+
+          // Play ringtone immediately and then every 3 seconds
+          playRingtone();
+          log('🔔 Ringtone played');
+
+          const ringInterval = setInterval(playRingtone, 3000);
+
+          // Stop after 9 seconds (3 rings)
+          setTimeout(() => {
+            clearInterval(ringInterval);
+            log('🔔 Ringing stopped');
+          }, 9000);
+        } catch (error) {
+          log('❌ Failed to play ringing sound: ' + error.message);
+        }
+      }
+    </script>
+  </body>
+</html>

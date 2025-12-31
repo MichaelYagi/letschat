@@ -1,7 +1,7 @@
 // Test script to verify the backend functionality
 const sqlite3 = require('sqlite3').verbose();
 
-const db = new sqlite3.Database('./chat.db');
+const db = new sqlite3.Database('./data/chat.db');
 
 console.log('=== Testing Database Setup ===');
 

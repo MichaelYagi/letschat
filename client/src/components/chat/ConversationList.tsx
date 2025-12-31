@@ -601,7 +601,10 @@ export function ConversationList({
                                   const username = otherParticipant
                                     ? otherParticipant.username
                                     : 'Unknown';
-                                  startCall(conversation.id, username, 'voice');
+                                  const userId = otherParticipant
+                                    ? otherParticipant.id
+                                    : conversation.id;
+                                  startCall(userId, username, 'voice');
                                 }}
                                 className='p-1 text-green-600 hover:bg-green-50 rounded-full transition-colors'
                                 title='Voice Call'
@@ -616,7 +619,10 @@ export function ConversationList({
                                   const username = otherParticipant
                                     ? otherParticipant.username
                                     : 'Unknown';
-                                  startCall(conversation.id, username, 'video');
+                                  const userId = otherParticipant
+                                    ? otherParticipant.id
+                                    : conversation.id;
+                                  startCall(userId, username, 'video');
                                 }}
                                 className='p-1 text-purple-600 hover:bg-purple-50 rounded-full transition-colors'
                                 title='Video Call'

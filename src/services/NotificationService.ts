@@ -11,7 +11,14 @@ export class NotificationService {
    */
   static async createNotification(
     userId: string,
-    type: 'message' | 'connection_request' | 'mention' | 'system',
+    type:
+      | 'message'
+      | 'connection_request'
+      | 'mention'
+      | 'system'
+      | 'incoming-call'
+      | 'call-missed'
+      | 'call-ended',
     title: string,
     message: string,
     data?: any
@@ -211,23 +218,63 @@ export class NotificationService {
   }
 
   /**
-   * Create a mention notification
+   * Create a system notification
    */
-  static async createMentionNotification(
-    recipientId: string,
-    mentionerName: string,
-    messagePreview: string,
+  static async createSystemNotification(
+    userId: string,
+    title: string,
+    message: string,
+    data?: any
+  ): Promise<Notification> {
+    return await this.createNotification(
+      userId,
+      'system',
+      title,
+      message,
+      data
+    );
+  }
+
+  /**
+   * Create an incoming call notification
+   */
+  static async createIncomingCallNotification(
+    userId: string,
+    callerName: string,
+    callType: 'voice' | 'video',
     conversationId: string
   ): Promise<Notification> {
     return await this.createNotification(
-      recipientId,
-      'mention',
-      'You were mentioned',
-      `${mentionerName} mentioned you: ${messagePreview.substring(0, 50)}${messagePreview.length > 50 ? '...' : ''}`,
+      userId,
+      'incoming-call',
+      `Incoming ${callType} call`,
+      `${callerName} is calling you`,
       {
+        callType,
         conversationId,
-        mentionerName,
-        type: 'mention',
+        callerName,
+        timestamp: new Date().toISOString(),
+      }
+    );
+  }
+
+  /**
+   * Create a missed call notification
+   */
+  static async createMissedCallNotification(
+    userId: string,
+    callerName: string,
+    callType: 'voice' | 'video'
+  ): Promise<Notification> {
+    return await this.createNotification(
+      userId,
+      'call-missed',
+      'Missed call',
+      `You missed a ${callType} call from ${callerName}`,
+      {
+        callType,
+        callerName,
+        timestamp: new Date().toISOString(),
       }
     );
   }

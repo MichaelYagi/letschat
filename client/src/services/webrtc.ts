@@ -28,11 +28,14 @@ export class WebRTCService {
   private isVideoEnabled = true;
   private eventListeners: Map<string, ((event: CallEvent) => void)[]> =
     new Map();
+  private sendSignalingCallback: ((message: any) => void) | null = null;
 
   private config: WebRTCConfig = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun.stunprotocol.org:3478' },
     ],
   };
 
@@ -89,6 +92,10 @@ export class WebRTCService {
     video: boolean = true
   ): Promise<MediaStream> {
     try {
+      console.log('🎤 Initializing local stream with constraints:', {
+        audio,
+        video,
+      });
       const constraints = {
         audio,
         video: video
@@ -103,10 +110,18 @@ export class WebRTCService {
       this.isAudioEnabled = audio;
       this.isVideoEnabled = video;
 
+      console.log('✅ Local stream initialized successfully');
+      console.log('🎤 Audio tracks:', this.localStream.getAudioTracks().length);
+      console.log('📹 Video tracks:', this.localStream.getVideoTracks().length);
+
       this.emit('call-started', { stream: this.localStream });
       return this.localStream;
     } catch (error) {
-      console.error('Failed to get local stream:', error);
+      console.error('❌ Failed to get local stream:', error);
+      console.error(
+        '🎤 Microphone permission:',
+        navigator.permissions ? 'check available' : 'not supported'
+      );
       throw error;
     }
   }
@@ -143,21 +158,20 @@ export class WebRTCService {
   createPeerConnection(userId: string): RTCPeerConnection {
     const peerConnection = new RTCPeerConnection(this.config);
 
-    // Add local stream to peer connection
-    if (this.localStream) {
-      this.localStream.getTracks().forEach(track => {
-        peerConnection.addTrack(track, this.localStream!);
-      });
-    }
+    // Don't add local stream here - will be added in createOffer/createAnswer
+    // to ensure stream is available before creating offer/answer
 
     // Handle ICE candidates
     peerConnection.onicecandidate = event => {
       if (event.candidate) {
+        console.log('🧊 Sending ICE candidate to:', userId);
         // Send ice candidate to remote user via signaling
         this.sendSignalingMessage(userId, {
           type: 'ice-candidate',
           candidate: event.candidate,
         });
+      } else {
+        console.log('🧊 ICE gathering completed for:', userId);
       }
     };
 
@@ -165,14 +179,30 @@ export class WebRTCService {
     peerConnection.ontrack = event => {
       const [remoteStream] = event.streams;
       this.addRemoteStream(userId, remoteStream);
+
+      // Emit event when remote stream is received (connection is fully established)
+      console.log('🎥 Remote stream received from:', userId);
+      this.emit('user-joined', { userId, stream: remoteStream });
     };
 
     // Handle connection state changes
     peerConnection.onconnectionstatechange = () => {
-      if (
+      console.log(
+        '📞 WebRTC connection state for',
+        userId,
+        ':',
+        peerConnection.connectionState
+      );
+
+      if (peerConnection.connectionState === 'connected') {
+        console.log('✅ WebRTC connection established with:', userId);
+        console.log('🎉 Both users should now be able to hear each other!');
+        this.emit('call-started', { userId, connected: true });
+      } else if (
         peerConnection.connectionState === 'disconnected' ||
         peerConnection.connectionState === 'failed'
       ) {
+        console.log('❌ WebRTC connection failed for:', userId);
         this.removeUser(userId);
       }
     };
@@ -184,8 +214,25 @@ export class WebRTCService {
   // Call management for 1-on-1 calls
   async createOffer(userId: string): Promise<RTCSessionDescriptionInit> {
     const peerConnection = this.getOrCreatePeerConnection(userId);
+
+    // Add the called user to track them
+    this.addUser({ id: userId, username: userId });
+
+    // Add local stream to peer connection before creating offer
+    if (this.localStream) {
+      console.log('🎤 Adding local stream to peer connection for offer');
+      this.localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, this.localStream!);
+      });
+    } else {
+      console.error('❌ No local stream available when creating offer');
+      throw new Error('Local stream not initialized');
+    }
+
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
+
+    console.log('📞 WebRTC offer created for:', userId);
     return offer;
   }
 
@@ -194,9 +241,26 @@ export class WebRTCService {
     offer: RTCSessionDescriptionInit
   ): Promise<RTCSessionDescriptionInit> {
     const peerConnection = this.getOrCreatePeerConnection(userId);
+
+    // Add the user to the users map to track them
+    this.addUser({ id: userId, username: userId });
+
+    // Add local stream to peer connection before creating answer
+    if (this.localStream) {
+      console.log('🎤 Adding local stream to peer connection for answer');
+      this.localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, this.localStream!);
+      });
+    } else {
+      console.error('❌ No local stream available when creating answer');
+      throw new Error('Local stream not initialized');
+    }
+
     await peerConnection.setRemoteDescription(offer);
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
+
+    console.log('✅ WebRTC answer created for:', userId);
     return answer;
   }
 
@@ -204,9 +268,21 @@ export class WebRTCService {
     userId: string,
     answer: RTCSessionDescriptionInit
   ): Promise<void> {
+    console.log('📞 Handling WebRTC answer from:', userId);
     const peerConnection = this.peerConnections.get(userId);
     if (peerConnection) {
       await peerConnection.setRemoteDescription(answer);
+      console.log('✅ WebRTC answer handled for:', userId);
+      console.log(
+        '📊 Connection state after answer:',
+        peerConnection.connectionState
+      );
+      console.log(
+        '📊 ICE connection state:',
+        peerConnection.iceConnectionState
+      );
+    } else {
+      console.error('❌ No peer connection found for:', userId);
     }
   }
 
@@ -214,9 +290,13 @@ export class WebRTCService {
     userId: string,
     candidate: RTCIceCandidateInit
   ): Promise<void> {
+    console.log('🧊 Received ICE candidate from:', userId);
     const peerConnection = this.peerConnections.get(userId);
     if (peerConnection) {
       await peerConnection.addIceCandidate(candidate);
+      console.log('✅ ICE candidate added for:', userId);
+    } else {
+      console.error('❌ No peer connection found for ICE candidate:', userId);
     }
   }
 
@@ -285,10 +365,26 @@ export class WebRTCService {
     return Array.from(this.users.values());
   }
 
+  // Set WebSocket callback for signaling
+  setSignalingCallback(callback: (message: any) => void): void {
+    this.sendSignalingCallback = callback;
+  }
+
   // Signaling (to be implemented with your WebSocket)
   sendSignalingMessage(userId: string, message: any): void {
     // This should send message via your WebSocket signaling server
-    console.log('Signaling message to', userId, ':', message);
+    console.log('📞 WebRTC sending signaling message to', userId, ':', message);
+
+    if (this.sendSignalingCallback) {
+      this.sendSignalingCallback({
+        ...message,
+        targetUserId: userId,
+      });
+    } else {
+      console.error(
+        '❌ WebSocket callback not set - cannot send signaling message'
+      );
+    }
   }
 
   // Cleanup
